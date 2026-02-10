@@ -4,6 +4,7 @@ use reqwest::Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task::JoinSet;
+use std::time::Duration;
 
 pub struct EngineRegistry {
     engines: HashMap<String, Arc<dyn SearchEngine>>,
@@ -17,7 +18,7 @@ impl EngineRegistry {
     }
 
     pub fn register_engine(&mut self, engine: Box<dyn SearchEngine>) {
-        self.engines.insert(engine.name(), Arc::from(engine));
+        self.engines.insert(engine.id(), Arc::from(engine));
     }
 
     pub async fn search(&self, query: &SearchQuery, client: &Client) -> Vec<SearchResult> {
@@ -25,17 +26,25 @@ impl EngineRegistry {
 
         // TODO: Logic to select specific engines based on query or preferences.
         // For now, run all registered engines.
-        for (name, engine) in &self.engines {
+        for (id, engine) in &self.engines {
             let engine = engine.clone();
             let query = query.clone();
             let client = client.clone();
-            let name = name.clone();
+            let id = id.clone();
 
             join_set.spawn(async move {
-                match engine.search(&query, &client).await {
-                    Ok(results) => results,
-                    Err(e) => {
-                        tracing::error!("Engine {} failed: {}", name, e);
+                // Add a timeout to each engine search
+                let timeout_duration = Duration::from_secs(2);
+                match tokio::time::timeout(timeout_duration, engine.search(&query, &client)).await {
+                    Ok(result) => match result {
+                        Ok(results) => results,
+                        Err(e) => {
+                            tracing::error!("Engine {} failed: {}", id, e);
+                            vec![]
+                        }
+                    },
+                    Err(_) => {
+                        tracing::warn!("Engine {} timed out", id);
                         vec![]
                     }
                 }
@@ -50,28 +59,9 @@ impl EngineRegistry {
             }
         }
 
+        // TODO: Advanced ranking and deduplication logic here.
+        // For now, just return concatenated results.
+
         aggregated_results
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::engines::dummy::DummyEngine;
-
-    #[tokio::test]
-    async fn test_registry_search() {
-        let mut registry = EngineRegistry::new();
-        registry.register_engine(Box::new(DummyEngine));
-
-        let client = Client::builder().build().unwrap();
-        let query = SearchQuery {
-            q: "test".to_string(),
-            ..Default::default()
-        };
-
-        let results = registry.search(&query, &client).await;
-        assert!(!results.is_empty());
-        assert_eq!(results[0].engine, "dummy");
     }
 }

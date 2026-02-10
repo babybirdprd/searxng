@@ -1,53 +1,53 @@
 # SearXNG Rust Port Roadmap
 
-## Philosophy
-The goal of this port is **not** a direct line-by-line translation of the Python codebase. Instead, we aim to re-architect SearXNG to leverage Rust's strengths:
-- **Ownership & Concurrency:** Utilize Rust's ownership model and async runtime (Tokio) for safe, efficient, and concurrent search engine querying without the overhead of Python's GIL or multiprocessing.
-- **Type Safety:** Enforce correctness at compile time using robust types for search queries, results, and engine configurations.
-- **Zero-Cost Abstractions:** Use traits and generics to define search engine interfaces that incur no runtime penalty.
-- **Single Binary:** The final artifact should be a single, statically linked binary with embedded assets (templates, static files), easy to deploy and run anywhere.
+## Vision
+The goal is to create a high-performance, single-binary, memory-safe, and privacy-respecting meta-search engine. This port aims to replace the Python implementation with a modern Rust architecture, leveraging its type system, concurrency model, and ecosystem. We are stripping away legacy complexity in favor of clean, idiomatic design.
 
-## Roadmap
+## Key Principles
+1.  **Single Binary:** Everything needed to run the instance should be compile-time included or easily distributable.
+2.  **Zero-Cost Abstractions:** Use Rust's traits and generics to handle engine polymorphism without runtime overhead where possible.
+3.  **Concurrency:** Utilize `tokio` for efficient asynchronous I/O, handling thousands of concurrent upstream requests.
+4.  **Type Safety:** Leverage the type system to prevent common classes of bugs (e.g., proper error handling with `Result`, strong typing for configuration).
+5.  **Modularity:** Clean separation of concerns (Engines, Aggregation, Frontend, Configuration).
 
-### Phase 1: Core Architecture & Foundation (In Progress)
-- [x] **Project Setup**: Initialize Rust project with `cargo`, set up directory structure.
-- [x] **Web Framework**: Integrate `axum` for high-performance, asynchronous HTTP handling.
-- [x] **Configuration**: Implement a type-safe configuration system using `config-rs`.
-- [ ] **Engine Trait Definition**: Define the `SearchEngine` trait for standardizing engine interactions.
-- [ ] **Engine Registry**: Implement a mechanism to register, configure, and retrieve search engines dynamically.
-- [ ] **Concurrent Dispatch**: Build the logic to query multiple engines in parallel using `tokio` and aggregate results.
+## Milestones
 
-### Phase 2: Search Logic & Data Handling
-- [ ] **HTTP Client**: Integrate `reqwest` with a shared connection pool for efficient outbound requests.
-- [ ] **Result Aggregation**: Implement algorithms for deduplication, scoring, and ranking of search results from various engines.
-- [ ] **Error Handling**: Robust error handling for network failures, timeouts, and parsing errors (using `thiserror` and `anyhow`).
-- [ ] **Safe Search & Filtering**: Implement logic for safe search levels and language/region filtering.
+### Phase 1: Core Architecture (Current)
+- [x] **Project Skeleton:** Basic `axum` web server, `tokio` runtime, `reqwest` client.
+- [x] **Configuration:** Loading settings from files and environment variables (`config` crate).
+- [x] **Engine Trait Definition:** Define a robust `SearchEngine` trait that supports:
+    - Asynchronous searching.
+    - Configuration injection.
+    - Error handling (Retries, Timeouts).
+    - Metadata (Name, Categories, Weight).
+- [ ] **Engine Registry:** Dynamic loading and management of engines based on configuration.
+- [x] **Result Aggregation:** Basic merging of results from multiple engines.
 
-### Phase 3: User Interface & Experience
-- [ ] **Templating**: Integreate a compile-time templating engine (e.g., `askama` or `rinja`) for high-performance HTML rendering.
-- [ ] **Static Assets**: Embed static assets (CSS, JS, images) into the binary using `rust-embed`.
-- [ ] **Search API**: Expose a JSON API for programmatic access, maintaining compatibility with existing clients where possible.
-- [ ] **Preferences**: Implement user preferences (stored in cookies or local storage) without server-side state.
+### Phase 2: Engine Implementation & Stabilization
+- [ ] **Common Engines:** Implement core engines (Google, Bing, DuckDuckGo, Wikipedia, Qwant).
+- [ ] **Generic Engine Types:** Create reusable engine patterns (e.g., `XPathEngine`, `JsonEngine`) to easily port simple engines without writing custom Rust code for each.
+- [ ] **Rate Limiting & Proxy Support:** Robust handling of upstream rate limits, utilizing rotating proxies if configured.
+- [ ] **Scoring & Deduplication:** Implement algorithms to rank results and remove duplicates.
 
-### Phase 4: Engine Implementations
-- [ ] **General Engines**: Port major general engines (Google, Bing, DuckDuckGo, Wikipedia).
-- [ ] **Specialized Engines**: Port specialized engines (Images, Videos, IT, Maps).
-- [ ] **Scraper Logic**: Implement robust HTML parsing (using `scraper` or `select`) and JSON handling for extracting results.
+### Phase 3: Frontend & User Experience
+- [ ] **Templating:** Integrate `askama` for type-safe, compile-time compiled HTML templates.
+- [ ] **Static Assets:** Embed CSS/JS assets into the binary using `rust-embed`.
+- [ ] **Search Interface:** Implement the core search UI (Search bar, Results page).
+- [ ] **Preferences:** Handle user preferences (Cookies/LocalStorage).
 
-### Phase 5: Advanced Features & Optimization
-- [ ] **Rate Limiting**: Implement request rate limiting to prevent abuse.
-- [ ] **Image Proxy**: secure image proxying to protect user privacy.
-- [ ] **Plugin System**: (Optional) Explore WASM-based plugins for extending functionality without recompilation.
-- [ ] **Metrics & Monitoring**: Integrate `tracing` and `metrics` for observability.
+### Phase 4: Advanced Features & Optimization
+- [ ] **Categories:** Support for Images, Videos, News, IT, etc.
+- [ ] **Localization:** Internationalization support.
+- [ ] **Cache Layer:** In-memory or Redis-based caching for search results.
+- [ ] **Metrics:** Prometheus metrics for monitoring engine health and performance.
 
-## Architecture Deviations from Python
-1.  **Concurrency Model**: Replaced Python's threading/multiprocessing with Rust's async/await (Tokio). This allows handling thousands of concurrent connections and engine requests with minimal overhead.
-2.  **Configuration**: Static, type-checked configuration structs instead of dynamic Python dictionaries.
-3.  **Templating**: Compile-time template rendering (Askama) instead of runtime (Jinja2) for significant performance gains and safety.
-4.  **No Global State**: Explicit dependency injection of configuration and HTTP clients, avoiding global mutable state.
+### Phase 5: Production Readiness
+- [ ] **Security Audit:** Review for common web vulnerabilities.
+- [ ] **Dockerization:** Minimal scratch/distroless Docker image.
+- [ ] **CI/CD:** Automated testing and release pipeline.
 
-## Getting Started
-To run the project:
-```bash
-cargo run
-```
+## Architectural Decisions (vs Python)
+- **Concurrency:** Rust's `async`/`await` model allows us to spawn a task per engine request with minimal overhead, unlike Python's threading/multiprocessing.
+- **Error Handling:** We use `Result<T, E>` everywhere. No exceptions. This forces developers to handle failure cases explicitly.
+- **Configuration:** Strictly typed configuration using structs, validated at startup.
+- **Templates:** `askama` compiles templates to Rust code, ensuring no runtime template errors and high performance.
