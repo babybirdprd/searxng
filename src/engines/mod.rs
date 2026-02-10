@@ -28,3 +28,4 @@ pub trait SearchEngine: Send + Sync {
     /// Perform the search.
     async fn search(&self, query: &SearchQuery, client: &Client) -> Result<Vec<SearchResult>, EngineError>;
 }
+pub mod duckduckgo;

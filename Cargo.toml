@@ -22,3 +22,4 @@ tower-http = { version = "0.5", features = ["trace", "fs", "cors"] }
 clap = { version = "4.5", features = ["derive"] }
 rust-embed = "8.3"
 async-trait = "0.1"
+scraper = "0.25"
