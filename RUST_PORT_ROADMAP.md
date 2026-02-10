@@ -1,44 +1,60 @@
-# Rust Port Roadmap for SearXNG
+# SearXNG Rust Port Roadmap
 
 ## Goal
-To provide a high-performance, memory-safe, single-binary distribution of SearXNG by porting the core logic to Rust. This port aims to re-architect the codebase to leverage Rust's ownership model, type system, and zero-cost abstractions, rather than performing a line-by-line translation.
+The goal of this project is to create a high-performance, single-binary, idiomatic Rust port of SearXNG. This port aims to eliminate the complexity of the original Python codebase while retaining its core functionality and extensibility.
 
-## Principles
-- **Idiomatic Rust**: Leverage ownership, type system, and concurrency features (e.g., `async/await`, `tokio`).
-- **Performance**: Use zero-cost abstractions where possible. Minimize allocations and cloning.
-- **Maintainability**: Modular architecture with clear boundaries (e.g., `SearchEngine` trait, `EngineRegistry`).
-- **Compatibility**: Maintain compatibility with existing SearXNG ecosystem where reasonable, but prioritize better architecture.
-- **Single Binary**: The end goal is a single executable that includes everything needed to run a SearXNG instance.
+## Architectural Vision
+- **Single Binary**: The entire application (web server, engine logic, aggregation) will be compiled into a single executable, simplifying deployment.
+- **Async/Await**: Leverage Rust's `async`/`await` ecosystem (primarily `tokio`) for high-concurrency handling of search requests.
+- **Type Safety**: Utilize Rust's strong type system to prevent runtime errors, specifically using Enums for result types and `Result` for error handling.
+- **Zero-Cost Abstractions**: designing the system to minimize overhead, using traits for engine definitions and generics where appropriate.
+- **Configuration**: A robust configuration system that mirrors the flexibility of `settings.yml` but with stricter validation.
 
-## Phase 1: Foundation (Completed)
-- [x] Basic project structure (`tokio`, `axum`, `reqwest`).
-- [x] `SearchEngine` trait definition.
-- [x] `EngineRegistry` for concurrent execution.
-- [x] Basic configuration loading (`config` crate).
-- [x] Dummy engine for testing.
+## Milestones
 
-## Phase 2: Core Engine Architecture (In Progress)
-- [x] Implement robust engine configuration (enable/disable, weights, throttling).
-- [ ] Add `tokens` and `extra` configuration fields to support API keys and engine-specific settings.
-- [ ] Implement `Google` engine skeleton to validate multi-engine architecture.
-- [ ] Enhance `ResultAggregator` to handle score boosting for duplicate results.
-- [ ] Refine error handling using `thiserror` for library errors and `anyhow` for application errors.
-- [ ] Implement common middleware for engines (e.g., User-Agent rotation, request delays).
+### 1. Core Architecture (Current Phase)
+- [x] Basic project structure (`src/main.rs`, `src/lib.rs`).
+- [x] Configuration loading (`config` crate).
+- [x] Basic Engine Registry and Trait definition.
+- [x] Refined `SearchResult` model (Enums for Text, Image, Video, etc.).
+- [x] robust Error Handling (`thiserror` for libraries, `anyhow` for apps).
 
-## Phase 3: Web Interface & API (Next)
-- [ ] Implement HTML templating (using `Askama` or `Tera`).
-- [ ] Port static assets handling (embed in binary using `rust-embed`).
-- [ ] Implement advanced query parsing (search syntax like `!ddg`, `!g`).
-- [ ] Add support for different output formats (JSON, CSV, RSS).
+### 2. Engine Implementation
+- [x] Port core engines (Google, DuckDuckGo).
+- [ ] Implement a generic HTTP client with rate limiting and proxy support.
+- [ ] Support for different result types (HTML scraping, JSON APIs).
 
-## Phase 4: Advanced Features
-- [ ] Redis integration for caching (using `redis` crate).
-- [ ] Rate limiting and anti-bot protection.
-- [ ] Plugin system (possibly via compile-time features or WASM).
-- [ ] Proxy support for engines.
+### 3. Result Aggregation
+- [x] Advanced deduplication logic.
+- [ ] Scoring and ranking improvements.
+- [ ] Pagination support.
 
-## Phase 5: Polish & Release
-- [ ] Comprehensive testing (unit, integration).
-- [ ] Benchmarking against Python implementation.
-- [ ] CI/CD pipelines.
-- [ ] Documentation.
+### 4. Web Interface
+- [ ] REST API for search results (JSON).
+- [ ] HTML templating (using `askama` or `tera`) for the frontend.
+- [ ] Static asset serving.
+
+### 5. Plugin System (Future)
+- [ ] WASM-based plugins for extending functionality without recompilation.
+
+## Technical Guidelines
+
+### Error Handling
+- Use `thiserror` for defining library-level errors (e.g., `EngineError`).
+- Use `anyhow` for application-level error handling in `main.rs` and top-level handlers.
+- Errors should be propagated, not swallowed, unless explicitly handled.
+
+### Concurrency
+- Use `tokio::task::JoinSet` for managing concurrent engine requests.
+- Ensure proper timeout handling for every network request.
+- Use `Arc` and `Mutex`/`RwLock` judiciously for shared state.
+
+### Testing
+- Unit tests for all core logic (engines, aggregation).
+- Integration tests for the web server and full search flow.
+- use `mockall` or similar for mocking HTTP responses in tests.
+
+## Contribution
+- Follow idiomatic Rust coding standards (`cargo fmt`, `cargo clippy`).
+- Document all public functions and structs.
+- Write tests for new features.
