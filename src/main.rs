@@ -5,6 +5,7 @@ mod web;
 
 use crate::config::Settings;
 use crate::engines::dummy::DummyEngine;
+use crate::engines::duckduckgo::DuckDuckGo;
 use crate::engines::registry::EngineRegistry;
 use crate::web::AppState;
 use reqwest::Client;
@@ -30,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut registry = EngineRegistry::new();
     registry.register_engine(Box::new(DummyEngine));
+    registry.register_engine(Box::new(DuckDuckGo));
     let registry = Arc::new(registry);
 
     let state = AppState {
