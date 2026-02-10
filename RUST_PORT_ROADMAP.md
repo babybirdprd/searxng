@@ -17,11 +17,11 @@ To provide a high-performance, memory-safe, single-binary distribution of SearXN
 - [x] Dummy engine for testing.
 
 ## Phase 2: Core Engine Architecture (In Progress)
-- [ ] Implement robust engine configuration (enable/disable, weights, throttling).
+- [x] Implement robust engine configuration (enable/disable, weights, throttling).
 - [ ] Add concrete engine implementations (DuckDuckGo, Google, Bing, etc.).
 - [ ] Implement HTML parsing capabilities (using `scraper` or similar).
 - [ ] Enhance error handling and reporting.
-- [ ] Add result aggregation and ranking logic.
+- [x] Add result aggregation and ranking logic.
 
 ## Phase 3: Web Interface & API
 - [ ] Implement HTML templating (Askama or similar).

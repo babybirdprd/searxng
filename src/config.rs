@@ -1,6 +1,35 @@
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::env;
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct EngineConfig {
+    #[serde(default = "default_engine_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_engine_weight")]
+    pub weight: f64,
+    #[serde(default = "default_engine_timeout")]
+    pub timeout: u64, // seconds
+    #[serde(default = "default_engine_throttle")]
+    pub throttle: u64, // milliseconds
+}
+
+fn default_engine_enabled() -> bool { true }
+fn default_engine_weight() -> f64 { 1.0 }
+fn default_engine_timeout() -> u64 { 2 }
+fn default_engine_throttle() -> u64 { 500 }
+
+impl Default for EngineConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_engine_enabled(),
+            weight: default_engine_weight(),
+            timeout: default_engine_timeout(),
+            throttle: default_engine_throttle(),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServerSettings {
@@ -13,6 +42,8 @@ pub struct ServerSettings {
 pub struct Settings {
     pub server: ServerSettings,
     pub debug: bool,
+    #[serde(default)]
+    pub engines: HashMap<String, EngineConfig>,
 }
 
 impl Settings {
