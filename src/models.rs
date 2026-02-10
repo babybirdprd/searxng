@@ -1,10 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+fn default_page() -> u32 {
+    1
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SearchQuery {
     pub q: String,
+    #[serde(default)]
     pub language: String,
+    #[serde(default = "default_page")]
     pub page: u32,
+    #[serde(default)]
     pub safesearch: u8,
 }
 

@@ -1,13 +1,36 @@
 use crate::config::Settings;
-use axum::{routing::get, Router};
+use crate::engines::registry::EngineRegistry;
+use crate::models::{SearchQuery, SearchResult};
+use axum::{
+    extract::{Query, State},
+    routing::get,
+    Json, Router,
+};
+use reqwest::Client;
 use std::sync::Arc;
 
-pub fn router(settings: Arc<Settings>) -> Router {
+#[derive(Clone)]
+pub struct AppState {
+    pub settings: Arc<Settings>,
+    pub registry: Arc<EngineRegistry>,
+    pub client: Client,
+}
+
+pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health_check))
-        .with_state(settings)
+        .route("/search", get(search))
+        .with_state(state)
 }
 
 async fn health_check() -> &'static str {
     "OK"
+}
+
+async fn search(
+    State(state): State<AppState>,
+    Query(query): Query<SearchQuery>,
+) -> Json<Vec<SearchResult>> {
+    let results = state.registry.search(&query, &state.client).await;
+    Json(results)
 }

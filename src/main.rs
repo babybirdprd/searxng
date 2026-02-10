@@ -4,6 +4,10 @@ mod models;
 mod web;
 
 use crate::config::Settings;
+use crate::engines::dummy::DummyEngine;
+use crate::engines::registry::EngineRegistry;
+use crate::web::AppState;
+use reqwest::Client;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -20,7 +24,21 @@ async fn main() -> anyhow::Result<()> {
     let settings = Settings::new()?;
     let settings = Arc::new(settings);
 
-    let app = web::router(settings.clone());
+    let client = Client::builder()
+        .user_agent("Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)")
+        .build()?;
+
+    let mut registry = EngineRegistry::new();
+    registry.register_engine(Box::new(DummyEngine));
+    let registry = Arc::new(registry);
+
+    let state = AppState {
+        settings: settings.clone(),
+        registry,
+        client,
+    };
+
+    let app = web::router(state);
 
     let addr = format!("{}:{}", settings.server.bind_address, settings.server.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
