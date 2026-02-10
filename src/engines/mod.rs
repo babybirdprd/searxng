@@ -1,6 +1,8 @@
 pub mod dummy;
 pub mod registry;
 pub mod error;
+pub mod aggregator;
+pub mod duckduckgo;
 
 use crate::models::{SearchQuery, SearchResult};
 use async_trait::async_trait;
@@ -28,4 +30,3 @@ pub trait SearchEngine: Send + Sync {
     /// Perform the search.
     async fn search(&self, query: &SearchQuery, client: &Client) -> Result<Vec<SearchResult>, EngineError>;
 }
-pub mod duckduckgo;

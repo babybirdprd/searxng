@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
         .user_agent("Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)")
         .build()?;
 
-    let mut registry = EngineRegistry::new();
+    let mut registry = EngineRegistry::new(settings.clone());
     registry.register_engine(Box::new(DummyEngine));
     registry.register_engine(Box::new(DuckDuckGo));
     let registry = Arc::new(registry);
