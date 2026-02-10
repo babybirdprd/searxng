@@ -2,6 +2,7 @@ pub mod dummy;
 pub mod registry;
 pub mod error;
 pub mod aggregator;
+pub mod google;
 pub mod duckduckgo;
 
 use crate::models::{SearchQuery, SearchResult};

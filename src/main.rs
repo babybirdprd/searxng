@@ -5,6 +5,7 @@ mod web;
 
 use crate::config::Settings;
 use crate::engines::dummy::DummyEngine;
+use crate::engines::google::Google;
 use crate::engines::duckduckgo::DuckDuckGo;
 use crate::engines::registry::EngineRegistry;
 use crate::web::AppState;
@@ -32,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
     let mut registry = EngineRegistry::new(settings.clone());
     registry.register_engine(Box::new(DummyEngine));
     registry.register_engine(Box::new(DuckDuckGo));
+    registry.register_engine(Box::new(Google));
     let registry = Arc::new(registry);
 
     let state = AppState {
