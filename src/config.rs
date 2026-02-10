@@ -13,6 +13,10 @@ pub struct EngineConfig {
     pub timeout: u64, // seconds
     #[serde(default = "default_engine_throttle")]
     pub throttle: u64, // milliseconds
+    #[serde(default)]
+    pub tokens: Vec<String>,
+    #[serde(default)]
+    pub extra: HashMap<String, String>,
 }
 
 fn default_engine_enabled() -> bool { true }
@@ -27,6 +31,8 @@ impl Default for EngineConfig {
             weight: default_engine_weight(),
             timeout: default_engine_timeout(),
             throttle: default_engine_throttle(),
+            tokens: Vec::new(),
+            extra: HashMap::new(),
         }
     }
 }
