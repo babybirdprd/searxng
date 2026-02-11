@@ -3,14 +3,20 @@ pub mod circuit_breaker;
 pub mod duckduckgo;
 pub mod dummy;
 pub mod error;
+pub mod bing;
 pub mod google;
+pub mod qwant;
+pub mod reddit;
 pub mod registry;
+pub mod wikipedia;
 
 use crate::config::EngineConfig;
 use crate::models::{SearchQuery, SearchResult};
 use async_trait::async_trait;
 use error::EngineError;
 use reqwest::Client;
+
+pub const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)";
 
 #[async_trait]
 pub trait SearchEngine: Send + Sync {

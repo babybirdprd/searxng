@@ -7,16 +7,16 @@ use reqwest::Client;
 use scraper::{Html, Selector};
 use std::collections::HashMap;
 
-pub struct DuckDuckGo;
+pub struct Bing;
 
 #[async_trait]
-impl SearchEngine for DuckDuckGo {
+impl SearchEngine for Bing {
     fn id(&self) -> String {
-        "duckduckgo".to_string()
+        "bing".to_string()
     }
 
     fn name(&self) -> String {
-        "DuckDuckGo".to_string()
+        "Bing".to_string()
     }
 
     fn categories(&self) -> Vec<String> {
@@ -29,49 +29,36 @@ impl SearchEngine for DuckDuckGo {
         client: &Client,
         _config: &EngineConfig,
     ) -> Result<Vec<SearchResult>, EngineError> {
-        let url = "https://html.duckduckgo.com/html/";
+        let url = "https://www.bing.com/search";
 
-        let language = if query.language.is_empty() {
-            "wt-wt"
-        } else {
-            &query.language
-        };
+        let first = (query.page - 1) * 10 + 1;
 
-        let kp = match query.safesearch {
-            0 => "-1",
-            1 => "-2",
-            _ => "1",
-        };
-
-        let s = ((query.page - 1) * 30).to_string();
-
-        let params = [
-            ("q", query.q.as_str()),
-            ("b", ""),
-            ("kl", language),
-            ("kp", kp),
-            ("s", &s),
+        let mut params = vec![
+            ("q", query.q.clone()),
+            ("first", first.to_string()),
         ];
 
-        let resp = client.post(url).form(&params).send().await?;
+        if query.safesearch > 0 {
+            params.push(("adlt", if query.safesearch == 1 { "moderate".to_string() } else { "strict".to_string() }));
+        } else {
+            params.push(("adlt", "off".to_string()));
+        }
+
+        let resp = client.get(url).query(&params).send().await?;
 
         if !resp.status().is_success() {
-            return Err(EngineError::Unexpected(anyhow::anyhow!(
-                "DuckDuckGo returned status: {}",
-                resp.status()
-            )));
+             return Err(EngineError::Unexpected(anyhow::anyhow!("Bing returned {}", resp.status())));
         }
 
         let text = resp.text().await?;
         let document = Html::parse_document(&text);
 
-        // Selectors
-        let result_selector = Selector::parse("div#links > div.web-result")
+        let result_selector = Selector::parse("li.b_algo")
             .map_err(|e| EngineError::Parsing(format!("Invalid result selector: {:?}", e)))?;
         let title_selector = Selector::parse("h2 > a")
-             .map_err(|e| EngineError::Parsing(format!("Invalid title selector: {:?}", e)))?;
-        let snippet_selector = Selector::parse("a.result__snippet")
-             .map_err(|e| EngineError::Parsing(format!("Invalid snippet selector: {:?}", e)))?;
+            .map_err(|e| EngineError::Parsing(format!("Invalid title selector: {:?}", e)))?;
+        let snippet_selector = Selector::parse(".b_caption p, .b_algo_text")
+            .map_err(|e| EngineError::Parsing(format!("Invalid snippet selector: {:?}", e)))?;
 
         let mut results = Vec::new();
 

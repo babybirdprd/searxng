@@ -1,7 +1,8 @@
-use crate::config::{EngineConfig, Settings};
+use arc_swap::ArcSwap;
+use crate::config::Settings;
 use crate::engines::aggregator::aggregate;
 use crate::engines::circuit_breaker::CircuitBreaker;
-use crate::engines::create_client;
+use crate::engines::{create_client, DEFAULT_USER_AGENT};
 use crate::engines::SearchEngine;
 use crate::models::{SearchQuery, SearchResult};
 use reqwest::Client;
@@ -14,7 +15,6 @@ use tokio::task::JoinSet;
 struct EngineEntry {
     engine: Arc<dyn SearchEngine>,
     categories: Vec<String>,
-    config: EngineConfig,
     client: Client,
     last_request: Arc<Mutex<Option<std::time::Instant>>>,
     circuit_breaker: Arc<Mutex<CircuitBreaker>>,
@@ -22,12 +22,12 @@ struct EngineEntry {
 
 pub struct EngineRegistry {
     engines: HashMap<String, EngineEntry>,
-    settings: Arc<Settings>,
+    settings: Arc<ArcSwap<Settings>>,
     default_client: Client,
 }
 
 impl EngineRegistry {
-    pub fn new(settings: Arc<Settings>, default_client: Client) -> Self {
+    pub fn new(settings: Arc<ArcSwap<Settings>>, default_client: Client) -> Self {
         Self {
             engines: HashMap::new(),
             settings,
@@ -40,18 +40,14 @@ impl EngineRegistry {
         let id = engine.id();
         let config = self
             .settings
+            .load()
             .engines
             .get(&id)
             .cloned()
             .unwrap_or_default();
 
         let client = if let Some(proxy) = &config.proxy {
-            // Need a user agent. We can reuse the default client's UA if accessible,
-            // or we need to pass it or store it.
-            // For now let's use a hardcoded one or one from settings?
-            // "Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)"
-            // Better to use what's configured.
-            match create_client("Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)", Some(proxy)) {
+            match create_client(DEFAULT_USER_AGENT, Some(proxy)) {
                 Ok(c) => c,
                 Err(e) => {
                     tracing::error!("Failed to create client for engine {}: {}", id, e);
@@ -70,7 +66,6 @@ impl EngineRegistry {
         let entry = EngineEntry {
             engine: Arc::from(engine),
             categories,
-            config,
             client,
             last_request: Arc::new(Mutex::new(None)),
             circuit_breaker,
@@ -81,9 +76,16 @@ impl EngineRegistry {
     pub async fn search(&self, query: &SearchQuery) -> Vec<SearchResult> {
         let mut join_set = JoinSet::new();
         let query_categories = query.get_categories();
+        let current_settings = self.settings.load();
 
         for (id, entry) in &self.engines {
-            if !entry.config.enabled {
+            let config = current_settings
+                .engines
+                .get(id)
+                .cloned()
+                .unwrap_or_default();
+
+            if !config.enabled {
                 continue;
             }
 
@@ -98,7 +100,7 @@ impl EngineRegistry {
             let query = query.clone();
             let client = entry.client.clone();
             let id = id.clone();
-            let config = entry.config.clone();
+            let config = config.clone();
             let last_request = entry.last_request.clone();
             let circuit_breaker = entry.circuit_breaker.clone();
 
@@ -176,13 +178,14 @@ impl EngineRegistry {
             }
         }
 
-        aggregate(raw_results)
+        aggregate(raw_results, &current_settings.blocklist)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::EngineConfig;
     use crate::engines::error::EngineError;
     use crate::models::{ResultContent, SearchResult};
     use async_trait::async_trait;
@@ -232,7 +235,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_category_filtering() {
         // Construct a dummy settings object manually
-        let settings = Arc::new(Settings {
+        let settings = Arc::new(ArcSwap::from(Arc::new(Settings {
              server: crate::config::ServerSettings {
                  bind_address: "127.0.0.1".into(),
                  port: 8080,
@@ -240,7 +243,8 @@ mod tests {
              },
              debug: false,
              engines: HashMap::new(),
-        });
+             blocklist: Vec::new(),
+        })));
 
         let client = Client::new();
         let mut registry = EngineRegistry::new(settings, client.clone());
@@ -289,7 +293,7 @@ mod tests {
             },
         );
 
-        let settings = Arc::new(Settings {
+        let settings = Arc::new(ArcSwap::from(Arc::new(Settings {
              server: crate::config::ServerSettings {
                  bind_address: "127.0.0.1".into(),
                  port: 8080,
@@ -297,7 +301,8 @@ mod tests {
              },
              debug: false,
              engines: engines_config,
-        });
+             blocklist: Vec::new(),
+        })));
 
         let client = Client::new();
         let mut registry = EngineRegistry::new(settings, client.clone());
@@ -339,7 +344,7 @@ mod tests {
             },
         );
 
-        let settings = Arc::new(Settings {
+        let settings = Arc::new(ArcSwap::from(Arc::new(Settings {
              server: crate::config::ServerSettings {
                  bind_address: "127.0.0.1".into(),
                  port: 8080,
@@ -347,7 +352,8 @@ mod tests {
              },
              debug: false,
              engines: engines_config,
-        });
+             blocklist: Vec::new(),
+        })));
 
         let client = Client::new();
         let mut registry = EngineRegistry::new(settings, client.clone());

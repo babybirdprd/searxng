@@ -1,4 +1,4 @@
-use crate::models::SearchResult;
+use crate::models::{ResultContent, SearchResult};
 use std::collections::HashMap;
 use url::Url;
 
@@ -45,15 +45,30 @@ fn normalize_url(url_str: &str) -> String {
 /// Aggregates search results from multiple engines.
 ///
 /// It performs the following operations:
-/// 1. Deduplicates results based on normalized URL.
-/// 2. Merges results:
+/// 1. Filters results based on the blocklist.
+/// 2. Deduplicates results based on normalized URL.
+/// 3. Merges results:
 ///    - Sums up scores (frequency boost).
 ///    - Combines engine lists.
-/// 3. Sorts results by score in descending order.
-pub fn aggregate(results: Vec<SearchResult>) -> Vec<SearchResult> {
+/// 4. Sorts results by score in descending order.
+pub fn aggregate(results: Vec<SearchResult>, blocklist: &[String]) -> Vec<SearchResult> {
     let mut unique_results: HashMap<String, SearchResult> = HashMap::new();
 
     for mut res in results {
+        // Host Blocking
+        if let Ok(url) = Url::parse(&res.url) {
+            if let Some(host) = url.host_str() {
+                if blocklist.iter().any(|blocked| host.contains(blocked)) {
+                    continue;
+                }
+            }
+        }
+
+        // HTML Sanitization
+        if let ResultContent::Text(ref text) = res.content {
+            res.content = ResultContent::Text(ammonia::clean(text));
+        }
+
         let normalized_url = normalize_url(&res.url);
 
         match unique_results.get_mut(&normalized_url) {
@@ -138,7 +153,7 @@ mod tests {
         };
 
         let results = vec![res1, res2, res3];
-        let aggregated = aggregate(results);
+        let aggregated = aggregate(results, &[]);
 
         assert_eq!(aggregated.len(), 2);
 
@@ -163,5 +178,52 @@ mod tests {
             .find(|r| r.url.contains("other.com"))
             .unwrap();
         assert!((other_res.score - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_aggregate_sanitization() {
+        let res = SearchResult {
+            url: "https://example.com".to_string(),
+            title: "Example".to_string(),
+            content: ResultContent::Text("<script>alert('xss')</script>Safe content".to_string()),
+            engines: vec!["engine1".to_string()],
+            score: 1.0,
+            metadata: HashMap::new(),
+        };
+
+        let aggregated = aggregate(vec![res], &[]);
+        if let ResultContent::Text(ref text) = aggregated[0].content {
+            assert!(!text.contains("<script>"));
+            assert!(text.contains("Safe content"));
+        } else {
+            panic!("Wrong content type");
+        }
+    }
+
+    #[test]
+    fn test_aggregate_host_blocking() {
+        let res1 = SearchResult {
+            url: "https://blocked.com/path".to_string(),
+            title: "Blocked".to_string(),
+            content: ResultContent::Text("Content".to_string()),
+            engines: vec!["engine1".to_string()],
+            score: 1.0,
+            metadata: HashMap::new(),
+        };
+        let res2 = SearchResult {
+            url: "https://allowed.com/path".to_string(),
+            title: "Allowed".to_string(),
+            content: ResultContent::Text("Content".to_string()),
+            engines: vec!["engine1".to_string()],
+            score: 1.0,
+            metadata: HashMap::new(),
+        };
+
+        let blocklist = vec!["blocked.com".to_string()];
+        let results = vec![res1, res2];
+        let aggregated = aggregate(results, &blocklist);
+
+        assert_eq!(aggregated.len(), 1);
+        assert_eq!(aggregated[0].url, "https://allowed.com/path");
     }
 }

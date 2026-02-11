@@ -72,6 +72,8 @@ pub struct Settings {
     pub debug: bool,
     #[serde(default)]
     pub engines: HashMap<String, EngineConfig>,
+    #[serde(default)]
+    pub blocklist: Vec<String>,
 }
 
 impl Settings {
