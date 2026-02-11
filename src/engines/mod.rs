@@ -5,6 +5,7 @@ pub mod error;
 pub mod google;
 pub mod registry;
 
+use crate::config::EngineConfig;
 use crate::models::{SearchQuery, SearchResult};
 use async_trait::async_trait;
 use error::EngineError;
@@ -33,5 +34,6 @@ pub trait SearchEngine: Send + Sync {
         &self,
         query: &SearchQuery,
         client: &Client,
+        config: &EngineConfig,
     ) -> Result<Vec<SearchResult>, EngineError>;
 }
