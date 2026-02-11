@@ -1,6 +1,7 @@
 use crate::config::{EngineConfig, Settings};
 use crate::engines::aggregator::aggregate;
 use crate::engines::circuit_breaker::CircuitBreaker;
+use crate::engines::create_client;
 use crate::engines::SearchEngine;
 use crate::models::{SearchQuery, SearchResult};
 use reqwest::Client;
@@ -14,6 +15,7 @@ struct EngineEntry {
     engine: Arc<dyn SearchEngine>,
     categories: Vec<String>,
     config: EngineConfig,
+    client: Client,
     last_request: Arc<Mutex<Option<std::time::Instant>>>,
     circuit_breaker: Arc<Mutex<CircuitBreaker>>,
 }
@@ -21,13 +23,15 @@ struct EngineEntry {
 pub struct EngineRegistry {
     engines: HashMap<String, EngineEntry>,
     settings: Arc<Settings>,
+    default_client: Client,
 }
 
 impl EngineRegistry {
-    pub fn new(settings: Arc<Settings>) -> Self {
+    pub fn new(settings: Arc<Settings>, default_client: Client) -> Self {
         Self {
             engines: HashMap::new(),
             settings,
+            default_client,
         }
     }
 
@@ -41,6 +45,23 @@ impl EngineRegistry {
             .cloned()
             .unwrap_or_default();
 
+        let client = if let Some(proxy) = &config.proxy {
+            // Need a user agent. We can reuse the default client's UA if accessible,
+            // or we need to pass it or store it.
+            // For now let's use a hardcoded one or one from settings?
+            // "Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)"
+            // Better to use what's configured.
+            match create_client("Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)", Some(proxy)) {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::error!("Failed to create client for engine {}: {}", id, e);
+                    return;
+                }
+            }
+        } else {
+            self.default_client.clone()
+        };
+
         let circuit_breaker = Arc::new(Mutex::new(CircuitBreaker::new(
             config.failure_threshold,
             Duration::from_secs(config.cooldown),
@@ -50,13 +71,14 @@ impl EngineRegistry {
             engine: Arc::from(engine),
             categories,
             config,
+            client,
             last_request: Arc::new(Mutex::new(None)),
             circuit_breaker,
         };
         self.engines.insert(id, entry);
     }
 
-    pub async fn search(&self, query: &SearchQuery, client: &Client) -> Vec<SearchResult> {
+    pub async fn search(&self, query: &SearchQuery) -> Vec<SearchResult> {
         let mut join_set = JoinSet::new();
         let query_categories = query.get_categories();
 
@@ -74,7 +96,7 @@ impl EngineRegistry {
 
             let engine = entry.engine.clone();
             let query = query.clone();
-            let client = client.clone();
+            let client = entry.client.clone();
             let id = id.clone();
             let config = entry.config.clone();
             let last_request = entry.last_request.clone();
@@ -220,7 +242,8 @@ mod tests {
              engines: HashMap::new(),
         });
 
-        let mut registry = EngineRegistry::new(settings);
+        let client = Client::new();
+        let mut registry = EngineRegistry::new(settings, client.clone());
 
         registry.register_engine(Box::new(MockEngine {
             id: "general_engine".to_string(),
@@ -235,14 +258,12 @@ mod tests {
             call_count: Arc::new(Mutex::new(0)),
         }));
 
-        let client = Client::new();
-
         // 1. Test "general" category (default)
         let query_general = SearchQuery {
             q: "test".to_string(),
             ..Default::default()
         };
-        let results = registry.search(&query_general, &client).await;
+        let results = registry.search(&query_general).await;
         assert!(results.iter().any(|r| r.engines.contains(&"general_engine".to_string())), "general_engine should match default category");
         assert!(!results.iter().any(|r| r.engines.contains(&"image_engine".to_string())), "image_engine should NOT match default category");
 
@@ -252,7 +273,7 @@ mod tests {
             categories: "images".to_string(),
             ..Default::default()
         };
-        let results = registry.search(&query_images, &client).await;
+        let results = registry.search(&query_images).await;
         assert!(!results.iter().any(|r| r.engines.contains(&"general_engine".to_string())), "general_engine should NOT match images category");
         assert!(results.iter().any(|r| r.engines.contains(&"image_engine".to_string())), "image_engine should match images category");
     }
@@ -278,7 +299,8 @@ mod tests {
              engines: engines_config,
         });
 
-        let mut registry = EngineRegistry::new(settings);
+        let client = Client::new();
+        let mut registry = EngineRegistry::new(settings, client.clone());
         registry.register_engine(Box::new(MockEngine {
             id: "throttled_engine".to_string(),
             categories: vec!["general".to_string()],
@@ -286,20 +308,19 @@ mod tests {
             call_count: Arc::new(Mutex::new(0)),
         }));
 
-        let client = Client::new();
         let query = SearchQuery::default();
 
         let start = std::time::Instant::now();
 
         // First request should be immediate
-        registry.search(&query, &client).await;
+        registry.search(&query).await;
         let elapsed_first = start.elapsed();
         // Allow a bit of leeway for task spawning overhead
         assert!(elapsed_first < Duration::from_millis(200), "First request took too long: {:?}", elapsed_first);
 
         // Second request should be throttled
         let start_second = std::time::Instant::now();
-        registry.search(&query, &client).await;
+        registry.search(&query).await;
         let _elapsed_second = start_second.elapsed();
 
         let total_elapsed = start.elapsed();
@@ -328,7 +349,8 @@ mod tests {
              engines: engines_config,
         });
 
-        let mut registry = EngineRegistry::new(settings);
+        let client = Client::new();
+        let mut registry = EngineRegistry::new(settings, client.clone());
         let call_count = Arc::new(Mutex::new(0));
 
         registry.register_engine(Box::new(MockEngine {
@@ -338,26 +360,25 @@ mod tests {
             call_count: call_count.clone(),
         }));
 
-        let client = Client::new();
         let query = SearchQuery::default();
 
         // 1. First failure
-        registry.search(&query, &client).await;
+        registry.search(&query).await;
         assert_eq!(*call_count.lock().await, 1);
 
         // 2. Second failure (threshold reached)
-        registry.search(&query, &client).await;
+        registry.search(&query).await;
         assert_eq!(*call_count.lock().await, 2);
 
         // 3. Third request - should be blocked by circuit breaker
-        registry.search(&query, &client).await;
+        registry.search(&query).await;
         assert_eq!(*call_count.lock().await, 2, "Should not call engine when circuit is open");
 
         // 4. Wait for cooldown (1.1s to be safe)
         tokio::time::sleep(Duration::from_millis(1100)).await;
 
         // 5. Fourth request - should be allowed (Half-Open)
-        registry.search(&query, &client).await;
+        registry.search(&query).await;
         assert_eq!(*call_count.lock().await, 3, "Should call engine after cooldown");
     }
 }

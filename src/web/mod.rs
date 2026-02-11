@@ -6,14 +6,12 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use reqwest::Client;
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AppState {
     pub settings: Arc<Settings>,
     pub registry: Arc<EngineRegistry>,
-    pub client: Client,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -31,6 +29,6 @@ async fn search(
     State(state): State<AppState>,
     Query(query): Query<SearchQuery>,
 ) -> Json<Vec<SearchResult>> {
-    let results = state.registry.search(&query, &state.client).await;
+    let results = state.registry.search(&query).await;
     Json(results)
 }
