@@ -5,7 +5,7 @@ fn default_page() -> u32 {
     1
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchQuery {
     pub q: String,
     #[serde(default)]
@@ -14,6 +14,36 @@ pub struct SearchQuery {
     pub page: u32,
     #[serde(default)]
     pub safesearch: u8,
+    #[serde(default)]
+    pub categories: String,
+    #[serde(default)]
+    pub time_range: String,
+}
+
+impl Default for SearchQuery {
+    fn default() -> Self {
+        Self {
+            q: "".to_string(),
+            language: "".to_string(),
+            page: default_page(),
+            safesearch: 0,
+            categories: "".to_string(),
+            time_range: "".to_string(),
+        }
+    }
+}
+
+impl SearchQuery {
+    pub fn get_categories(&self) -> Vec<String> {
+        if self.categories.is_empty() {
+            return vec!["general".to_string()];
+        }
+        self.categories
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
