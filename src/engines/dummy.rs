@@ -39,7 +39,7 @@ impl SearchEngine for DummyEngine {
             url: "https://example.com".to_string(),
             title: format!("Example result for {}", query.q),
             content: ResultContent::Text("This is a dummy result".to_string()),
-            engine: "dummy".to_string(),
+            engines: vec!["dummy".to_string()],
             score: 1.0,
             metadata: HashMap::new(),
         }];

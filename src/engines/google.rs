@@ -34,7 +34,7 @@ impl SearchEngine for Google {
             url: "https://www.google.com/search?q=rust".to_string(),
             title: format!("Google Search Result for {}", query.q),
             content: ResultContent::Text("This is a mock result from the Google engine.".to_string()),
-            engine: self.id(),
+            engines: vec![self.id()],
             score: 1.0,
             metadata: HashMap::new(),
         }];

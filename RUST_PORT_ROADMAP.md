@@ -17,8 +17,8 @@ This roadmap outlines the comprehensive plan to port SearXNG to a fully idiomati
 -   [x] **Engine Registry**: Implement `EngineRegistry` for managing and executing engines concurrently.
 -   [ ] **Configuration System**:
     -   [x] Basic `Settings` struct using `config` crate.
-    -   [ ] **Granular Engine Config**: Support per-engine settings (weight, timeout, throttle, tokens).
-    -   [ ] **Environment Overrides**: Fully support `SEARXNG__` env vars for all settings.
+    -   [x] **Granular Engine Config**: Support per-engine settings (weight, timeout, throttle, tokens).
+    -   [x] **Environment Overrides**: Fully support `SEARXNG__` env vars for all settings.
     -   [ ] **Hot Reloading**: watch config file for changes (optional).
 -   [ ] **Error Handling**:
     -   [x] Basic `EngineError` using `thiserror`.
@@ -41,7 +41,7 @@ This roadmap outlines the comprehensive plan to port SearXNG to a fully idiomati
     -   [ ] **Images/Videos**: Add support for `ResultContent::Image` and `ResultContent::Video`.
 -   [ ] **Engine Features**:
     -   [x] **Category Filtering**: Engines should only run if they match the query category.
-    -   [ ] **Language Support**: Pass language codes to engines (e.g., `lang=en-US`).
+    -   [x] **Language Support**: Pass language codes to engines (e.g., `lang=en-US`).
     -   [ ] **Safe Search**: Implement safe search filtering at the engine level.
     -   [ ] **Paging**: Support `page` parameter in `SearchEngine::search`.
 
@@ -49,12 +49,12 @@ This roadmap outlines the comprehensive plan to port SearXNG to a fully idiomati
 
 -   [ ] **Result Aggregation**:
     -   [x] Basic deduplication by URL.
-    -   [ ] **Normalization**: Canonicalize URLs before deduplication (strip tracking params).
-    -   [ ] **Scoring Algorithm**: Implement a weighted scoring system:
+    -   [x] **Normalization**: Canonicalize URLs before deduplication (strip tracking params).
+    -   [x] **Scoring Algorithm**: Implement a weighted scoring system:
         -   Engine weight (configured).
         -   Result position (higher rank = higher score).
         -   Frequency (more engines = higher boost).
-    -   [ ] **Mixed Content**: robustly handle merging text, image, and map results.
+    -   [x] **Mixed Content**: robustly handle merging text, image, and map results.
 -   [ ] **Filtering & Sanitization**:
     -   [ ] **Host Blocking**: Filter results from blocked domains (configurable blacklist).
     -   [ ] **HTML Sanitization**: Ensure result snippets are safe to render (use `ammonia`).

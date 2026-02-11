@@ -123,9 +123,11 @@ impl EngineRegistry {
                     Ok(result) => match result {
                         Ok(mut results) => {
                             circuit_breaker.lock().await.report_success();
-                            // Apply weight
-                            for res in &mut results {
-                                res.score *= config.weight;
+                            // Apply weight and position decay
+                            for (index, res) in results.iter_mut().enumerate() {
+                                // Simple position decay: higher rank (lower index) gets more score
+                                // Formula: weight / (index + 1)
+                                res.score = config.weight / (index as f64 + 1.0);
                             }
                             results
                         }
@@ -198,7 +200,7 @@ mod tests {
                 url: format!("http://{}", self.id),
                 title: self.id.clone(),
                 content: ResultContent::Text("content".to_string()),
-                engine: self.id.clone(),
+                engines: vec![self.id.clone()],
                 score: 1.0,
                 metadata: HashMap::new(),
             }])
@@ -241,8 +243,8 @@ mod tests {
             ..Default::default()
         };
         let results = registry.search(&query_general, &client).await;
-        assert!(results.iter().any(|r| r.engine == "general_engine"), "general_engine should match default category");
-        assert!(!results.iter().any(|r| r.engine == "image_engine"), "image_engine should NOT match default category");
+        assert!(results.iter().any(|r| r.engines.contains(&"general_engine".to_string())), "general_engine should match default category");
+        assert!(!results.iter().any(|r| r.engines.contains(&"image_engine".to_string())), "image_engine should NOT match default category");
 
         // 2. Test "images" category
         let query_images = SearchQuery {
@@ -251,8 +253,8 @@ mod tests {
             ..Default::default()
         };
         let results = registry.search(&query_images, &client).await;
-        assert!(!results.iter().any(|r| r.engine == "general_engine"), "general_engine should NOT match images category");
-        assert!(results.iter().any(|r| r.engine == "image_engine"), "image_engine should match images category");
+        assert!(!results.iter().any(|r| r.engines.contains(&"general_engine".to_string())), "general_engine should NOT match images category");
+        assert!(results.iter().any(|r| r.engines.contains(&"image_engine".to_string())), "image_engine should match images category");
     }
 
     #[tokio::test]
