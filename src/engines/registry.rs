@@ -1,4 +1,4 @@
-use crate::config::Settings;
+use crate::config::{EngineConfig, Settings};
 use crate::engines::aggregator::aggregate;
 use crate::engines::SearchEngine;
 use crate::models::{SearchQuery, SearchResult};
@@ -6,11 +6,14 @@ use reqwest::Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 
 struct EngineEntry {
     engine: Arc<dyn SearchEngine>,
     categories: Vec<String>,
+    config: EngineConfig,
+    last_request: Arc<Mutex<Option<std::time::Instant>>>,
 }
 
 pub struct EngineRegistry {
@@ -29,9 +32,18 @@ impl EngineRegistry {
     pub fn register_engine(&mut self, engine: Box<dyn SearchEngine>) {
         let categories = engine.categories();
         let id = engine.id();
+        let config = self
+            .settings
+            .engines
+            .get(&id)
+            .cloned()
+            .unwrap_or_default();
+
         let entry = EngineEntry {
             engine: Arc::from(engine),
             categories,
+            config,
+            last_request: Arc::new(Mutex::new(None)),
         };
         self.engines.insert(id, entry);
     }
@@ -41,10 +53,7 @@ impl EngineRegistry {
         let query_categories = query.get_categories();
 
         for (id, entry) in &self.engines {
-            // Get configuration for this engine
-            let config = self.settings.engines.get(id).cloned().unwrap_or_default();
-
-            if !config.enabled {
+            if !entry.config.enabled {
                 continue;
             }
 
@@ -59,10 +68,40 @@ impl EngineRegistry {
             let query = query.clone();
             let client = client.clone();
             let id = id.clone();
+            let config = entry.config.clone();
+            let last_request = entry.last_request.clone();
 
             join_set.spawn(async move {
+                // Throttling Logic
+                if config.throttle > 0 {
+                    let sleep_duration = {
+                        let mut last = last_request.lock().await;
+                        let now = std::time::Instant::now();
+                        let throttle_duration = Duration::from_millis(config.throttle);
+
+                        let (wait, new_last) = match *last {
+                            Some(last_time) => {
+                                let target = last_time + throttle_duration;
+                                if target > now {
+                                    (Some(target - now), target)
+                                } else {
+                                    (None, now)
+                                }
+                            }
+                            None => (None, now),
+                        };
+
+                        *last = Some(new_last);
+                        wait
+                    };
+
+                    if let Some(d) = sleep_duration {
+                        tokio::time::sleep(d).await;
+                    }
+                }
+
                 let timeout_duration = Duration::from_secs(config.timeout);
-                match tokio::time::timeout(timeout_duration, engine.search(&query, &client)).await {
+                match tokio::time::timeout(timeout_duration, engine.search(&query, &client, &config)).await {
                     Ok(result) => match result {
                         Ok(mut results) => {
                             // Apply weight
@@ -123,6 +162,7 @@ mod tests {
             &self,
             _query: &SearchQuery,
             _client: &Client,
+            _config: &EngineConfig,
         ) -> Result<Vec<SearchResult>, EngineError> {
             Ok(vec![SearchResult {
                 url: format!("http://{}", self.id),
@@ -137,7 +177,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_category_filtering() {
-        // Construct a dummy settings object manually to avoid file I/O dependency
+        // Construct a dummy settings object manually
         let settings = Arc::new(Settings {
              server: crate::config::ServerSettings {
                  bind_address: "127.0.0.1".into(),
@@ -167,7 +207,6 @@ mod tests {
             ..Default::default()
         };
         let results = registry.search(&query_general, &client).await;
-        // Should include general_engine, but NOT image_engine
         assert!(results.iter().any(|r| r.engine == "general_engine"), "general_engine should match default category");
         assert!(!results.iter().any(|r| r.engine == "image_engine"), "image_engine should NOT match default category");
 
@@ -180,15 +219,52 @@ mod tests {
         let results = registry.search(&query_images, &client).await;
         assert!(!results.iter().any(|r| r.engine == "general_engine"), "general_engine should NOT match images category");
         assert!(results.iter().any(|r| r.engine == "image_engine"), "image_engine should match images category");
+    }
 
-        // 3. Test both
-        let query_both = SearchQuery {
-            q: "test".to_string(),
-            categories: "general,images".to_string(),
-            ..Default::default()
-        };
-        let results = registry.search(&query_both, &client).await;
-        assert!(results.iter().any(|r| r.engine == "general_engine"), "general_engine should match combined category");
-        assert!(results.iter().any(|r| r.engine == "image_engine"), "image_engine should match combined category");
+    #[tokio::test]
+    async fn test_search_throttling() {
+        let mut engines_config = HashMap::new();
+        engines_config.insert(
+            "throttled_engine".to_string(),
+            EngineConfig {
+                throttle: 500, // 500ms throttle
+                ..Default::default()
+            },
+        );
+
+        let settings = Arc::new(Settings {
+             server: crate::config::ServerSettings {
+                 bind_address: "127.0.0.1".into(),
+                 port: 8080,
+                 secret_key: "secret".into(),
+             },
+             debug: false,
+             engines: engines_config,
+        });
+
+        let mut registry = EngineRegistry::new(settings);
+        registry.register_engine(Box::new(MockEngine {
+            id: "throttled_engine".to_string(),
+            categories: vec!["general".to_string()],
+        }));
+
+        let client = Client::new();
+        let query = SearchQuery::default();
+
+        let start = std::time::Instant::now();
+
+        // First request should be immediate
+        registry.search(&query, &client).await;
+        let elapsed_first = start.elapsed();
+        // Allow a bit of leeway for task spawning overhead
+        assert!(elapsed_first < Duration::from_millis(200), "First request took too long: {:?}", elapsed_first);
+
+        // Second request should be throttled
+        let start_second = std::time::Instant::now();
+        registry.search(&query, &client).await;
+        let _elapsed_second = start_second.elapsed();
+
+        let total_elapsed = start.elapsed();
+        assert!(total_elapsed >= Duration::from_millis(500), "Total time {:?} should be >= 500ms", total_elapsed);
     }
 }

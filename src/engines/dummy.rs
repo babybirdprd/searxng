@@ -1,3 +1,4 @@
+use crate::config::EngineConfig;
 use crate::engines::error::EngineError;
 use crate::engines::SearchEngine;
 use crate::models::{ResultContent, SearchQuery, SearchResult};
@@ -29,6 +30,7 @@ impl SearchEngine for DummyEngine {
         &self,
         query: &SearchQuery,
         _client: &Client,
+        _config: &EngineConfig,
     ) -> Result<Vec<SearchResult>, EngineError> {
         // Simulate an asynchronous operation
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;

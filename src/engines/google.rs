@@ -1,3 +1,4 @@
+use crate::config::EngineConfig;
 use crate::engines::error::EngineError;
 use crate::engines::SearchEngine;
 use crate::models::{ResultContent, SearchQuery, SearchResult};
@@ -25,6 +26,7 @@ impl SearchEngine for Google {
         &self,
         query: &SearchQuery,
         _client: &Client,
+        _config: &EngineConfig,
     ) -> Result<Vec<SearchResult>, EngineError> {
         // For now, return a mock result to validate multi-engine support.
         // In the future, this will implement actual scraping or API calls.

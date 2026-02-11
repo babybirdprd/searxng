@@ -1,96 +1,104 @@
 # SearXNG Rust Port Roadmap
 
-This roadmap outlines the plan to port SearXNG to a fully idiomatic, high-performance Rust application. The goal is to eliminate reliance on the Python codebase, resulting in a single binary that is easier to deploy and maintain.
+This roadmap outlines the comprehensive plan to port SearXNG to a fully idiomatic, high-performance Rust application. The goal is to eliminate reliance on the legacy Python codebase, resulting in a single binary that is easier to deploy, maintain, and scale.
 
 ## Vision
 
--   **Single Binary**: All components (server, engines, assets) compiled into one executable.
--   **High Performance**: Leverage Rust's async runtime (Tokio) and zero-cost abstractions.
--   **Safety**: Use Rust's type system to prevent common errors (null pointer, data races).
--   **Maintainability**: Modular architecture with clear separation of concerns.
+-   **Single Binary**: All components (server, engines, assets) compiled into one executable using `rust-embed`.
+-   **High Performance**: Leverage Rust's async runtime (`tokio`) and zero-cost abstractions to handle high concurrency with minimal overhead.
+-   **Safety**: enforce strict type safety and memory safety to prevent common vulnerabilities.
+-   **Maintainability**: Modular architecture with clear separation of concerns (Engines, Aggregator, Web, Config).
 
 ## Phase 1: Core Architecture & Foundation (Current Status: In Progress)
 
--   [x] **Async Runtime**: Establish Tokio as the async runtime.
--   [x] **Web Framework**: Use Axum for high-performance HTTP handling.
+-   [x] **Async Runtime**: Establish `tokio` as the async runtime.
+-   [x] **Web Framework**: Use `axum` for high-performance HTTP handling.
 -   [x] **Engine Trait**: Define `SearchEngine` trait for standardizing engine implementation.
 -   [x] **Engine Registry**: Implement `EngineRegistry` for managing and executing engines concurrently.
--   [ ] **Configuration**:
+-   [ ] **Configuration System**:
     -   [x] Basic `Settings` struct using `config` crate.
-    -   [ ] Support for comprehensive YAML/TOML configuration files.
-    -   [ ] Environment variable overrides for all settings.
-    -   [ ] Hot-reloading of configuration (optional).
+    -   [ ] **Granular Engine Config**: Support per-engine settings (weight, timeout, throttle, tokens).
+    -   [ ] **Environment Overrides**: Fully support `SEARXNG__` env vars for all settings.
+    -   [ ] **Hot Reloading**: watch config file for changes (optional).
 -   [ ] **Error Handling**:
     -   [x] Basic `EngineError` using `thiserror`.
-    -   [ ] comprehensive error types for all subsystems (Config, Web, Aggregator).
-    -   [ ] Structured logging with `tracing`.
+    -   [ ] **Structured Logging**: Implement `tracing` with `tracing-subscriber` (JSON output for prod).
+    -   [ ] **Global Error Handling**: `axum` error handlers for graceful 500/404 responses.
 
 ## Phase 2: Engine Expansion & Robustness
 
+-   [ ] **Engine Execution**:
+    -   [ ] **Throttling**: Implement per-engine rate limiting (token bucket or simple sleep) to respect `throttle` config.
+    -   [ ] **Circuit Breakers**: temporarily disable engines that consistently fail or time out.
+    -   [ ] **Proxy Support**: specific proxy configuration per engine (`reqwest` proxy support).
+-   [ ] **Engine Implementations**:
+    -   [x] **DuckDuckGo**: Basic HTML scraping.
+    -   [ ] **Google**: Basic implementation (needs expansion).
+    -   [ ] **Bing**: HTML scraping or API.
+    -   [ ] **Wikipedia**: API integration.
+    -   [ ] **Reddit**: JSON API integration.
+    -   [ ] **General**: Port remaining general engines.
+    -   [ ] **Images/Videos**: Add support for `ResultContent::Image` and `ResultContent::Video`.
 -   [ ] **Engine Features**:
     -   [x] **Category Filtering**: Engines should only run if they match the query category.
-    -   [ ] **Time Range**: Support for filtering results by time (day, week, month, year).
-    -   [ ] **Language Support**: Pass language codes to engines.
-    -   [ ] **Safe Search**: Implement safe search filtering at the engine level where supported.
-    -   [ ] **Paging**: Support pagination in engines.
--   [ ] **Engine Implementations**:
-    -   [ ] Port major general engines: Bing, Yahoo, Startpage.
-    -   [ ] Port specialized engines: Wikipedia, Reddit, GitHub, StackOverflow.
-    -   [ ] Port image/video engines: Google Images, Bing Images, YouTube.
-    -   [ ] Implement "meta" engines (e.g., aggregating other aggregators).
--   [ ] **Resilience**:
-    -   [ ] **Rate Limiting**: Handle 429 errors gracefully with backoff and circuit breakers.
-    -   [ ] **Proxy Support**: specific proxy configuration per engine or global.
-    -   [ ] **CAPTCHA Handling**: Detect CAPTCHAs and potentially solve or skip.
+    -   [ ] **Language Support**: Pass language codes to engines (e.g., `lang=en-US`).
+    -   [ ] **Safe Search**: Implement safe search filtering at the engine level.
+    -   [ ] **Paging**: Support `page` parameter in `SearchEngine::search`.
 
 ## Phase 3: Aggregation & Ranking
 
 -   [ ] **Result Aggregation**:
     -   [x] Basic deduplication by URL.
-    -   [ ] **Advanced Deduplication**: Normalize URLs, handle tracking parameters.
-    -   [ ] **Scoring**: Implement a sophisticated scoring algorithm based on engine weights, position, and frequency.
-    -   [ ] **Mixed Content**: Handle merging results of different types (text, image, video).
--   [ ] **Filtering**:
-    -   [ ] **Host Blocking**: Filter results from blocked domains (e.g., spam, ads).
-    -   [ ] **Keyword Blocking**: Filter results containing blocked keywords.
+    -   [ ] **Normalization**: Canonicalize URLs before deduplication (strip tracking params).
+    -   [ ] **Scoring Algorithm**: Implement a weighted scoring system:
+        -   Engine weight (configured).
+        -   Result position (higher rank = higher score).
+        -   Frequency (more engines = higher boost).
+    -   [ ] **Mixed Content**: robustly handle merging text, image, and map results.
+-   [ ] **Filtering & Sanitization**:
+    -   [ ] **Host Blocking**: Filter results from blocked domains (configurable blacklist).
+    -   [ ] **HTML Sanitization**: Ensure result snippets are safe to render (use `ammonia`).
 
 ## Phase 4: Web Interface & User Experience
 
 -   [ ] **Templating**:
-    -   [ ] Integrate `askama` or `tera` for HTML rendering.
-    -   [ ] Port existing Jinja2 templates to the chosen Rust template engine.
-    -   [ ] Support for themes (simple, oscar, etc.).
+    -   [ ] Integrate `askama` for type-safe, compiled HTML templates.
+    -   [ ] Port existing Jinja2 templates to `askama`.
+    -   [ ] **Themes**: Support multiple themes (simple, oscar).
 -   [ ] **Static Assets**:
-    -   [ ] Embed static assets (CSS, JS, images) into the binary using `rust-embed`.
-    -   [ ] Serve static assets efficiently with caching headers.
+    -   [ ] Embed static assets (CSS, JS, images, fonts) into the binary using `rust-embed`.
+    -   [ ] Serve static assets with proper caching headers (`Cache-Control`, `ETag`).
 -   [ ] **API**:
     -   [x] Basic JSON API.
-    -   [ ] RSS/Atom feed support.
-    -   [ ] CSV/Opensearch support.
--   [ ] **Localization**:
-    -   [ ] Support internationalization (i18n) for UI text.
-    -   [ ] Auto-detect user language.
+    -   [ ] **RSS/Atom**: generating feeds for search results.
+    -   [ ] **OpenSearch**: Support OpenSearch description document.
+-   [ ] **Localization (i18n)**:
+    -   [ ] Use `fluent` or `gettext` for translating UI strings.
+    -   [ ] Auto-detect user language from headers.
 
 ## Phase 5: Advanced Features
 
 -   [ ] **Caching**:
-    -   [ ] In-memory caching (LRU) for frequent queries.
-    -   [ ] Redis support for distributed caching.
+    -   [ ] **In-Memory Cache**: `moka` or `lru` crate for caching search results (TTL based).
+    -   [ ] **Redis Cache**: Optional Redis backend for distributed caching.
 -   [ ] **Plugins/Middleware**:
-    -   [ ] Design a plugin system for extending functionality (e.g., query modification, result post-processing).
+    -   [ ] **Query Plugins**: Modify query before search (e.g., bang commands `!g`).
+    -   [ ] **Result Plugins**: Modify results after aggregation.
 -   [ ] **Metrics & Monitoring**:
-    -   [ ] Expose Prometheus metrics (request count, latency, engine health).
-    -   [ ] Health check endpoint with detailed status.
+    -   [ ] **Prometheus**: Expose metrics via `/metrics` (request count, latency, engine health).
+    -   [ ] **Health Check**: Detailed health status for k8s probes.
 
 ## Phase 6: Testing & Quality Assurance
 
--   [ ] **Unit Tests**: comprehensive unit tests for all modules.
--   [ ] **Integration Tests**: End-to-end tests spinning up the server and querying mock engines.
--   [ ] **Robot Tests**: Port existing robot framework tests or replace with Rust-native integration tests.
--   [ ] **Benchmarks**: Measure performance and memory usage to ensure improvements over Python version.
+-   [ ] **Unit Tests**: comprehensive unit tests for all modules (`engines`, `aggregator`, `config`).
+-   [ ] **Integration Tests**: End-to-end tests spinning up the `axum` server and querying mock engines.
+-   [ ] **Property-Based Testing**: Use `proptest` for fuzzing inputs.
+-   [ ] **Benchmarks**: Use `criterion` to measure performance critical paths (aggregation, parsing).
 
 ## Phase 7: Deployment & Maintenance
 
 -   [ ] **Docker**: Create a minimal Docker image (scratch or distroless).
--   [ ] **CI/CD**: Set up GitHub Actions for building, testing, and releasing.
--   [ ] **Documentation**: Write user and developer documentation.
+-   [ ] **CI/CD**: GitHub Actions for testing, linting (`clippy`), and building releases.
+-   [ ] **Documentation**:
+    -   [ ] Developer guide (architecture, contributing).
+    -   [ ] User guide (configuration, deployment).

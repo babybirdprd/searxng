@@ -1,3 +1,4 @@
+use crate::config::EngineConfig;
 use crate::engines::error::EngineError;
 use crate::engines::SearchEngine;
 use crate::models::{ResultContent, SearchQuery, SearchResult};
@@ -26,6 +27,7 @@ impl SearchEngine for DuckDuckGo {
         &self,
         query: &SearchQuery,
         client: &Client,
+        _config: &EngineConfig,
     ) -> Result<Vec<SearchResult>, EngineError> {
         let url = "https://html.duckduckgo.com/html/";
 
