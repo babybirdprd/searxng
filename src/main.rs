@@ -1,11 +1,11 @@
 use searxng_rs::config::Settings;
 use searxng_rs::engines::duckduckgo::DuckDuckGo;
 use searxng_rs::engines::dummy::DummyEngine;
+use searxng_rs::engines::create_client;
 use searxng_rs::engines::google::Google;
 use searxng_rs::engines::registry::EngineRegistry;
 use searxng_rs::web::AppState;
 use searxng_rs::web;
-use reqwest::Client;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -22,11 +22,12 @@ async fn main() -> anyhow::Result<()> {
     let settings = Settings::new()?;
     let settings = Arc::new(settings);
 
-    let client = Client::builder()
-        .user_agent("Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)")
-        .build()?;
+    let client = create_client(
+        "Mozilla/5.0 (compatible; SearXNG/1.0; +https://github.com/searxng/searxng)",
+        None,
+    )?;
 
-    let mut registry = EngineRegistry::new(settings.clone());
+    let mut registry = EngineRegistry::new(settings.clone(), client);
     registry.register_engine(Box::new(DummyEngine));
     registry.register_engine(Box::new(DuckDuckGo));
     registry.register_engine(Box::new(Google));
@@ -35,7 +36,6 @@ async fn main() -> anyhow::Result<()> {
     let state = AppState {
         settings: settings.clone(),
         registry,
-        client,
     };
 
     let app = web::router(state);

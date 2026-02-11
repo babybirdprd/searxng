@@ -17,6 +17,7 @@ pub struct EngineConfig {
     pub failure_threshold: u32,
     #[serde(default = "default_engine_cooldown")]
     pub cooldown: u64, // seconds
+    pub proxy: Option<String>,
     #[serde(default)]
     pub tokens: Vec<String>,
     #[serde(default)]
@@ -51,6 +52,7 @@ impl Default for EngineConfig {
             throttle: default_engine_throttle(),
             failure_threshold: default_engine_failure_threshold(),
             cooldown: default_engine_cooldown(),
+            proxy: None,
             tokens: Vec::new(),
             extra: HashMap::new(),
         }

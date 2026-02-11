@@ -38,3 +38,13 @@ pub trait SearchEngine: Send + Sync {
         config: &EngineConfig,
     ) -> Result<Vec<SearchResult>, EngineError>;
 }
+
+pub fn create_client(user_agent: &str, proxy: Option<&str>) -> reqwest::Result<Client> {
+    let mut builder = Client::builder().user_agent(user_agent);
+
+    if let Some(proxy_url) = proxy {
+        builder = builder.proxy(reqwest::Proxy::all(proxy_url)?);
+    }
+
+    builder.build()
+}
