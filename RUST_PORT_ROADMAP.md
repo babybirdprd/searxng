@@ -28,8 +28,8 @@ This roadmap outlines the comprehensive plan to port SearXNG to a fully idiomati
 ## Phase 2: Engine Expansion & Robustness
 
 -   [ ] **Engine Execution**:
-    -   [ ] **Throttling**: Implement per-engine rate limiting (token bucket or simple sleep) to respect `throttle` config.
-    -   [ ] **Circuit Breakers**: temporarily disable engines that consistently fail or time out.
+        -   [x] **Throttling**: Implement per-engine rate limiting (token bucket or simple sleep) to respect `throttle` config.
+        -   [x] **Circuit Breakers**: temporarily disable engines that consistently fail or time out.
     -   [ ] **Proxy Support**: specific proxy configuration per engine (`reqwest` proxy support).
 -   [ ] **Engine Implementations**:
     -   [x] **DuckDuckGo**: Basic HTML scraping.

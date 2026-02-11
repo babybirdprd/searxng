@@ -13,6 +13,10 @@ pub struct EngineConfig {
     pub timeout: u64, // seconds
     #[serde(default = "default_engine_throttle")]
     pub throttle: u64, // milliseconds
+    #[serde(default = "default_engine_failure_threshold")]
+    pub failure_threshold: u32,
+    #[serde(default = "default_engine_cooldown")]
+    pub cooldown: u64, // seconds
     #[serde(default)]
     pub tokens: Vec<String>,
     #[serde(default)]
@@ -31,6 +35,12 @@ fn default_engine_timeout() -> u64 {
 fn default_engine_throttle() -> u64 {
     500
 }
+fn default_engine_failure_threshold() -> u32 {
+    3
+}
+fn default_engine_cooldown() -> u64 {
+    60
+}
 
 impl Default for EngineConfig {
     fn default() -> Self {
@@ -39,6 +49,8 @@ impl Default for EngineConfig {
             weight: default_engine_weight(),
             timeout: default_engine_timeout(),
             throttle: default_engine_throttle(),
+            failure_threshold: default_engine_failure_threshold(),
+            cooldown: default_engine_cooldown(),
             tokens: Vec::new(),
             extra: HashMap::new(),
         }
