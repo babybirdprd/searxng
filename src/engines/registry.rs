@@ -9,11 +9,17 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 
+struct CircuitBreaker {
+    failures: u32,
+    cooldown_until: Option<std::time::Instant>,
+}
+
 struct EngineEntry {
     engine: Arc<dyn SearchEngine>,
     categories: Vec<String>,
     config: EngineConfig,
     last_request: Arc<Mutex<Option<std::time::Instant>>>,
+    circuit_breaker: Arc<Mutex<CircuitBreaker>>,
 }
 
 pub struct EngineRegistry {
@@ -44,6 +50,10 @@ impl EngineRegistry {
             categories,
             config,
             last_request: Arc::new(Mutex::new(None)),
+            circuit_breaker: Arc::new(Mutex::new(CircuitBreaker {
+                failures: 0,
+                cooldown_until: None,
+            })),
         };
         self.engines.insert(id, entry);
     }
@@ -62,6 +72,18 @@ impl EngineRegistry {
 
             if !category_match {
                 continue;
+            }
+
+            // Circuit Breaker Check
+            let circuit_breaker = entry.circuit_breaker.clone();
+            {
+                let cb = circuit_breaker.lock().await;
+                if let Some(cooldown) = cb.cooldown_until {
+                    if std::time::Instant::now() < cooldown {
+                        tracing::debug!("Engine {} is in cooldown", id);
+                        continue;
+                    }
+                }
             }
 
             let engine = entry.engine.clone();
@@ -104,6 +126,11 @@ impl EngineRegistry {
                 match tokio::time::timeout(timeout_duration, engine.search(&query, &client, &config)).await {
                     Ok(result) => match result {
                         Ok(mut results) => {
+                            // Success: Reset circuit breaker
+                            let mut cb = circuit_breaker.lock().await;
+                            cb.failures = 0;
+                            cb.cooldown_until = None;
+
                             // Apply weight
                             for res in &mut results {
                                 res.score *= config.weight;
@@ -112,11 +139,29 @@ impl EngineRegistry {
                         }
                         Err(e) => {
                             tracing::error!("Engine {} failed: {}", id, e);
+
+                            // Failure: Update circuit breaker
+                            let mut cb = circuit_breaker.lock().await;
+                            cb.failures += 1;
+                            if cb.failures >= 3 {
+                                cb.cooldown_until = Some(std::time::Instant::now() + Duration::from_secs(60));
+                                tracing::warn!("Engine {} circuit broken ({} failures)", id, cb.failures);
+                            }
+
                             vec![]
                         }
                     },
                     Err(_) => {
                         tracing::warn!("Engine {} timed out", id);
+
+                        // Timeout: Treat as failure
+                        let mut cb = circuit_breaker.lock().await;
+                        cb.failures += 1;
+                        if cb.failures >= 3 {
+                            cb.cooldown_until = Some(std::time::Instant::now() + Duration::from_secs(60));
+                            tracing::warn!("Engine {} circuit broken ({} failures - timeout)", id, cb.failures);
+                        }
+
                         vec![]
                     }
                 }
@@ -145,6 +190,7 @@ mod tests {
     struct MockEngine {
         id: String,
         categories: Vec<String>,
+        fail: bool,
     }
 
     #[async_trait]
@@ -164,6 +210,9 @@ mod tests {
             _client: &Client,
             _config: &EngineConfig,
         ) -> Result<Vec<SearchResult>, EngineError> {
+            if self.fail {
+                return Err(EngineError::Unexpected(anyhow::anyhow!("Simulated failure")));
+            }
             Ok(vec![SearchResult {
                 url: format!("http://{}", self.id),
                 title: self.id.clone(),
@@ -177,7 +226,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_category_filtering() {
-        // Construct a dummy settings object manually
         let settings = Arc::new(Settings {
              server: crate::config::ServerSettings {
                  bind_address: "127.0.0.1".into(),
@@ -193,22 +241,23 @@ mod tests {
         registry.register_engine(Box::new(MockEngine {
             id: "general_engine".to_string(),
             categories: vec!["general".to_string()],
+            fail: false,
         }));
         registry.register_engine(Box::new(MockEngine {
             id: "image_engine".to_string(),
             categories: vec!["images".to_string()],
+            fail: false,
         }));
 
         let client = Client::new();
 
-        // 1. Test "general" category (default)
         let query_general = SearchQuery {
             q: "test".to_string(),
             ..Default::default()
         };
         let results = registry.search(&query_general, &client).await;
-        assert!(results.iter().any(|r| r.engine == "general_engine"), "general_engine should match default category");
-        assert!(!results.iter().any(|r| r.engine == "image_engine"), "image_engine should NOT match default category");
+        assert!(results.iter().any(|r| r.engine == "general_engine"));
+        assert!(!results.iter().any(|r| r.engine == "image_engine"));
 
         // 2. Test "images" category
         let query_images = SearchQuery {
@@ -217,8 +266,8 @@ mod tests {
             ..Default::default()
         };
         let results = registry.search(&query_images, &client).await;
-        assert!(!results.iter().any(|r| r.engine == "general_engine"), "general_engine should NOT match images category");
-        assert!(results.iter().any(|r| r.engine == "image_engine"), "image_engine should match images category");
+        assert!(!results.iter().any(|r| r.engine == "general_engine"));
+        assert!(results.iter().any(|r| r.engine == "image_engine"));
     }
 
     #[tokio::test]
@@ -246,6 +295,7 @@ mod tests {
         registry.register_engine(Box::new(MockEngine {
             id: "throttled_engine".to_string(),
             categories: vec!["general".to_string()],
+            fail: false,
         }));
 
         let client = Client::new();
@@ -266,5 +316,40 @@ mod tests {
 
         let total_elapsed = start.elapsed();
         assert!(total_elapsed >= Duration::from_millis(500), "Total time {:?} should be >= 500ms", total_elapsed);
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker() {
+         let settings = Arc::new(Settings {
+             server: crate::config::ServerSettings {
+                 bind_address: "127.0.0.1".into(),
+                 port: 8080,
+                 secret_key: "secret".into(),
+             },
+             debug: false,
+             engines: HashMap::new(),
+        });
+
+        let mut registry = EngineRegistry::new(settings);
+        registry.register_engine(Box::new(MockEngine {
+            id: "failing_engine".to_string(),
+            categories: vec!["general".to_string()],
+            fail: true,
+        }));
+
+        let client = Client::new();
+        let query = SearchQuery::default();
+
+        // 3 failures to trip the breaker
+        for _ in 0..3 {
+            registry.search(&query, &client).await;
+        }
+
+        // Check if circuit breaker is tripped
+        let entry = registry.engines.get("failing_engine").unwrap();
+        {
+            let cb = entry.circuit_breaker.lock().await;
+            assert!(cb.cooldown_until.is_some(), "Circuit breaker should be tripped");
+        }
     }
 }

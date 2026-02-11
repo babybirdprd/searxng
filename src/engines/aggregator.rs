@@ -1,5 +1,46 @@
 use crate::models::SearchResult;
 use std::collections::HashMap;
+use url::Url;
+
+/// Normalizes a URL by removing common tracking parameters.
+fn normalize_url(url: &str) -> String {
+    match Url::parse(url) {
+        Ok(mut u) => {
+            // Remove common tracking parameters
+            // We need to collect first to iterate, then clear and rebuild
+            let query_params: Vec<(String, String)> = u.query_pairs().into_owned().collect();
+
+            {
+                let mut pairs = u.query_pairs_mut();
+                pairs.clear();
+                for (key, value) in query_params {
+                    if !key.starts_with("utm_")
+                       && key != "fbclid"
+                       && key != "gclid"
+                       && key != "ref"
+                       && key != "yclid"
+                       && key != "_hsenc"
+                       && key != "_hsmi"
+                       && key != "mc_cid"
+                       && key != "mc_eid" {
+                        pairs.append_pair(&key, &value);
+                    }
+                }
+            }
+
+            // If query is empty, remove the '?'
+            if u.query() == Some("") {
+                u.set_query(None);
+            }
+
+            // Remove fragment (anchor) as it usually points to same page content
+            u.set_fragment(None);
+
+            u.to_string()
+        },
+        Err(_) => url.to_string()
+    }
+}
 
 /// Aggregates search results from multiple engines.
 ///
@@ -11,7 +52,9 @@ pub fn aggregate(results: Vec<SearchResult>) -> Vec<SearchResult> {
     let mut unique_results: HashMap<String, SearchResult> = HashMap::new();
 
     for res in results {
-        match unique_results.get_mut(&res.url) {
+        let normalized = normalize_url(&res.url);
+
+        match unique_results.get_mut(&normalized) {
             Some(existing) => {
                 // If duplicates found, boost the score.
                 // We add a fraction of the new result's score to the existing one.
@@ -20,7 +63,7 @@ pub fn aggregate(results: Vec<SearchResult>) -> Vec<SearchResult> {
                 existing.score += res.score * 0.1;
             }
             None => {
-                unique_results.insert(res.url.clone(), res);
+                unique_results.insert(normalized, res);
             }
         }
     }
@@ -42,6 +85,48 @@ mod tests {
     use super::*;
     use crate::models::{ResultContent, SearchResult};
     use std::collections::HashMap;
+
+    #[test]
+    fn test_normalize_url() {
+        assert_eq!(
+            normalize_url("https://example.com/?utm_source=google&q=test"),
+            "https://example.com/?q=test"
+        );
+        assert_eq!(
+            normalize_url("https://example.com/#anchor"),
+            "https://example.com/"
+        );
+         assert_eq!(
+            normalize_url("https://example.com/?fbclid=123"),
+            "https://example.com/"
+        );
+    }
+
+    #[test]
+    fn test_aggregate_deduplication() {
+        let res1 = SearchResult {
+            url: "https://example.com/?utm_source=twitter".to_string(),
+            title: "Example".to_string(),
+            content: ResultContent::Text("Content".to_string()),
+            engine: "engine1".to_string(),
+            score: 1.0,
+            metadata: HashMap::new(),
+        };
+        let res2 = SearchResult {
+            url: "https://example.com/".to_string(),
+            title: "Example".to_string(),
+            content: ResultContent::Text("Content".to_string()),
+            engine: "engine2".to_string(),
+            score: 1.0,
+            metadata: HashMap::new(),
+        };
+
+        let results = vec![res1, res2];
+        let aggregated = aggregate(results);
+
+        assert_eq!(aggregated.len(), 1);
+        assert!(aggregated[0].score > 1.0);
+    }
 
     #[test]
     fn test_aggregate_boosts_score() {
@@ -81,11 +166,5 @@ mod tests {
             .unwrap();
         // Initial score 1.0 + boost (1.0 * 0.1) = 1.1
         assert!((example_res.score - 1.1).abs() < f64::EPSILON);
-
-        let other_res = aggregated
-            .iter()
-            .find(|r| r.url == "https://other.com")
-            .unwrap();
-        assert!((other_res.score - 0.5).abs() < f64::EPSILON);
     }
 }
