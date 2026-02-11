@@ -59,19 +59,19 @@ This roadmap outlines the comprehensive plan to port SearXNG to a fully idiomati
     -   [x] **Host Blocking**: Filter results from blocked domains (configurable blacklist).
     -   [x] **HTML Sanitization**: Ensure result snippets are safe to render (use `ammonia`).
 
-## Phase 4: Web Interface & User Experience
+## Phase 4: Web Interface & User Experience (Status: In Progress)
 
--   [ ] **Templating**:
-    -   [ ] Integrate `askama` for type-safe, compiled HTML templates.
-    -   [ ] Port existing Jinja2 templates to `askama`.
+-   [x] **Templating**:
+    -   [x] Integrate `askama` for type-safe, compiled HTML templates.
+    -   [x] Port existing Jinja2 templates to `askama`.
     -   [ ] **Themes**: Support multiple themes (simple, oscar).
--   [ ] **Static Assets**:
-    -   [ ] Embed static assets (CSS, JS, images, fonts) into the binary using `rust-embed`.
-    -   [ ] Serve static assets with proper caching headers (`Cache-Control`, `ETag`).
--   [ ] **API**:
+-   [x] **Static Assets**:
+    -   [x] Embed static assets (CSS, JS, images, fonts) into the binary using `rust-embed`.
+    -   [x] Serve static assets with proper caching headers (`Cache-Control`, `ETag`).
+-   [x] **API**:
     -   [x] Basic JSON API.
-    -   [ ] **RSS/Atom**: generating feeds for search results.
-    -   [ ] **OpenSearch**: Support OpenSearch description document.
+    -   [x] **RSS/Atom**: generating feeds for search results.
+    -   [x] **OpenSearch**: Support OpenSearch description document.
 -   [ ] **Localization (i18n)**:
     -   [ ] Use `fluent` or `gettext` for translating UI strings.
     -   [ ] Auto-detect user language from headers.

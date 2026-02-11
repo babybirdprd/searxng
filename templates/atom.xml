@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>{{ instance_name }} - {{ query }}</title>
+  <link href="{{ base_url }}/search?q={{ query|urlencode }}&amp;format=atom" rel="self"/>
+  <link href="{{ base_url }}/search?q={{ query|urlencode }}"/>
+  <id>{{ base_url }}/search?q={{ query|urlencode }}</id>
+  <updated>2024-02-11T00:00:00Z</updated> <!-- Simplified -->
+  {% for result in results %}
+  <entry>
+    <title>{{ result.title }}</title>
+    <link href="{{ result.url }}"/>
+    <id>{{ result.url }}</id>
+    <content type="html">
+        {% match result.content %}
+            {% when crate::models::ResultContent::Text(text) %}
+                {{ text }}
+            {% when _ %}
+                Media result
+        {% endmatch %}
+    </content>
+  </entry>
+  {% endfor %}
+</feed>

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}{{ query }} -{% endblock %}
+
+{% block body_class %}results_endpoint{% endblock %}
+
+{% block content %}
+<div id="results_container">
+    <div id="search_header">
+        <form action="/search" method="GET" role="search">
+            <input type="search" name="q" value="{{ query }}" required>
+            <button type="submit">
+                {{ crate::web::templates::helpers::icon("search")|safe }}
+            </button>
+        </form>
+    </div>
+
+    <div id="results">
+        {% for result in results %}
+        <article class="result">
+            <h3><a href="{{ result.url }}">{{ result.title }}</a></h3>
+            <div class="content">
+                {% match result.content %}
+                    {% when crate::models::ResultContent::Text(text) %}
+                        {{ text|safe }}
+                    {% when crate::models::ResultContent::Image { src, thumbnail } %}
+                        <img src="{{ src }}" alt="{{ result.title }}">
+                    {% when crate::models::ResultContent::Video { src, thumbnail, duration } %}
+                        <video src="{{ src }}"></video>
+                    {% when crate::models::ResultContent::Map { latitude, longitude, zoom } %}
+                        Map at {{ latitude }}, {{ longitude }}
+                {% endmatch %}
+            </div>
+            <div class="engines">
+                {% for engine in result.engines %}
+                <span class="engine">{{ engine }}</span>
+                {% endfor %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

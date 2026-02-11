@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{% endblock %} {{ instance_name }}</title>
+    <link rel="stylesheet" href="/static/sxng-ltr.min.css" type="text/css">
+    <link rel="icon" href="/static/img/favicon.png" sizes="any">
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <nav id="links_on_top">
+        <a href="/" class="link_on_top_about">{{ crate::web::templates::helpers::icon_big("information-circle")|safe }}<span>About</span></a>
+        <a href="https://searxng.org" class="link_on_top_donate">{{ crate::web::templates::helpers::icon_big("heart")|safe }}<span>Donate</span></a>
+        <a href="#" class="link_on_top_preferences">{{ crate::web::templates::helpers::icon_big("settings")|safe }}<span>Preferences</span></a>
+    </nav>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <footer>
+        <p>Powered by <a href="/">SearXNG</a> - a privacy-respecting, open metasearch engine</p>
+    </footer>
+    <script type="module" src="/static/sxng-core.min.js"></script>
+</body>
+</html>

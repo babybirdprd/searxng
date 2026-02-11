@@ -60,14 +60,21 @@ impl Default for EngineConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct GeneralSettings {
+    pub instance_name: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerSettings {
     pub bind_address: String,
     pub port: u16,
+    pub base_url: String,
     pub secret_key: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
+    pub general: GeneralSettings,
     pub server: ServerSettings,
     pub debug: bool,
     #[serde(default)]
@@ -83,8 +90,10 @@ impl Settings {
         let s = Config::builder()
             // Start with default values
             .set_default("debug", false)?
+            .set_default("general.instance_name", "SearXNG")?
             .set_default("server.bind_address", "127.0.0.1")?
             .set_default("server.port", 8080)?
+            .set_default("server.base_url", "http://localhost:8080")?
             .set_default("server.secret_key", "changeme")?
             // Merge with config file (if exists)
             .add_source(File::with_name("settings").required(false))
