@@ -1,5 +1,6 @@
 use crate::config::{EngineConfig, Settings};
 use crate::engines::aggregator::aggregate;
+use crate::engines::circuit_breaker::CircuitBreaker;
 use crate::engines::SearchEngine;
 use crate::models::{SearchQuery, SearchResult};
 use reqwest::Client;
@@ -14,6 +15,7 @@ struct EngineEntry {
     categories: Vec<String>,
     config: EngineConfig,
     last_request: Arc<Mutex<Option<std::time::Instant>>>,
+    circuit_breaker: Arc<Mutex<CircuitBreaker>>,
 }
 
 pub struct EngineRegistry {
@@ -39,11 +41,17 @@ impl EngineRegistry {
             .cloned()
             .unwrap_or_default();
 
+        let circuit_breaker = Arc::new(Mutex::new(CircuitBreaker::new(
+            config.failure_threshold,
+            Duration::from_secs(config.cooldown),
+        )));
+
         let entry = EngineEntry {
             engine: Arc::from(engine),
             categories,
             config,
             last_request: Arc::new(Mutex::new(None)),
+            circuit_breaker,
         };
         self.engines.insert(id, entry);
     }
@@ -70,8 +78,18 @@ impl EngineRegistry {
             let id = id.clone();
             let config = entry.config.clone();
             let last_request = entry.last_request.clone();
+            let circuit_breaker = entry.circuit_breaker.clone();
 
             join_set.spawn(async move {
+                // Circuit Breaker Check
+                {
+                    let mut cb = circuit_breaker.lock().await;
+                    if !cb.check() {
+                        tracing::warn!("Engine {} circuit breaker is open", id);
+                        return vec![];
+                    }
+                }
+
                 // Throttling Logic
                 if config.throttle > 0 {
                     let sleep_duration = {
@@ -104,6 +122,7 @@ impl EngineRegistry {
                 match tokio::time::timeout(timeout_duration, engine.search(&query, &client, &config)).await {
                     Ok(result) => match result {
                         Ok(mut results) => {
+                            circuit_breaker.lock().await.report_success();
                             // Apply weight
                             for res in &mut results {
                                 res.score *= config.weight;
@@ -111,11 +130,13 @@ impl EngineRegistry {
                             results
                         }
                         Err(e) => {
+                            circuit_breaker.lock().await.report_failure();
                             tracing::error!("Engine {} failed: {}", id, e);
                             vec![]
                         }
                     },
                     Err(_) => {
+                        circuit_breaker.lock().await.report_failure();
                         tracing::warn!("Engine {} timed out", id);
                         vec![]
                     }
@@ -145,6 +166,8 @@ mod tests {
     struct MockEngine {
         id: String,
         categories: Vec<String>,
+        fail: bool,
+        call_count: Arc<Mutex<u32>>,
     }
 
     #[async_trait]
@@ -164,6 +187,13 @@ mod tests {
             _client: &Client,
             _config: &EngineConfig,
         ) -> Result<Vec<SearchResult>, EngineError> {
+            let mut count = self.call_count.lock().await;
+            *count += 1;
+
+            if self.fail {
+                return Err(EngineError::Unexpected(anyhow::anyhow!("Mock failure")));
+            }
+
             Ok(vec![SearchResult {
                 url: format!("http://{}", self.id),
                 title: self.id.clone(),
@@ -193,10 +223,14 @@ mod tests {
         registry.register_engine(Box::new(MockEngine {
             id: "general_engine".to_string(),
             categories: vec!["general".to_string()],
+            fail: false,
+            call_count: Arc::new(Mutex::new(0)),
         }));
         registry.register_engine(Box::new(MockEngine {
             id: "image_engine".to_string(),
             categories: vec!["images".to_string()],
+            fail: false,
+            call_count: Arc::new(Mutex::new(0)),
         }));
 
         let client = Client::new();
@@ -246,6 +280,8 @@ mod tests {
         registry.register_engine(Box::new(MockEngine {
             id: "throttled_engine".to_string(),
             categories: vec!["general".to_string()],
+            fail: false,
+            call_count: Arc::new(Mutex::new(0)),
         }));
 
         let client = Client::new();
@@ -266,5 +302,60 @@ mod tests {
 
         let total_elapsed = start.elapsed();
         assert!(total_elapsed >= Duration::from_millis(500), "Total time {:?} should be >= 500ms", total_elapsed);
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_integration() {
+        let mut engines_config = HashMap::new();
+        engines_config.insert(
+            "failing_engine".to_string(),
+            EngineConfig {
+                failure_threshold: 2,
+                cooldown: 1, // 1 second
+                ..Default::default()
+            },
+        );
+
+        let settings = Arc::new(Settings {
+             server: crate::config::ServerSettings {
+                 bind_address: "127.0.0.1".into(),
+                 port: 8080,
+                 secret_key: "secret".into(),
+             },
+             debug: false,
+             engines: engines_config,
+        });
+
+        let mut registry = EngineRegistry::new(settings);
+        let call_count = Arc::new(Mutex::new(0));
+
+        registry.register_engine(Box::new(MockEngine {
+            id: "failing_engine".to_string(),
+            categories: vec!["general".to_string()],
+            fail: true,
+            call_count: call_count.clone(),
+        }));
+
+        let client = Client::new();
+        let query = SearchQuery::default();
+
+        // 1. First failure
+        registry.search(&query, &client).await;
+        assert_eq!(*call_count.lock().await, 1);
+
+        // 2. Second failure (threshold reached)
+        registry.search(&query, &client).await;
+        assert_eq!(*call_count.lock().await, 2);
+
+        // 3. Third request - should be blocked by circuit breaker
+        registry.search(&query, &client).await;
+        assert_eq!(*call_count.lock().await, 2, "Should not call engine when circuit is open");
+
+        // 4. Wait for cooldown (1.1s to be safe)
+        tokio::time::sleep(Duration::from_millis(1100)).await;
+
+        // 5. Fourth request - should be allowed (Half-Open)
+        registry.search(&query, &client).await;
+        assert_eq!(*call_count.lock().await, 3, "Should call engine after cooldown");
     }
 }

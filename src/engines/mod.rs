@@ -1,4 +1,5 @@
 pub mod aggregator;
+pub mod circuit_breaker;
 pub mod duckduckgo;
 pub mod dummy;
 pub mod error;
