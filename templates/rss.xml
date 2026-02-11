@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>{{ instance_name }} - {{ query }}</title>
+    <link>{{ base_url }}/search?q={{ query|urlencode }}</link>
+    <description>Search results for "{{ query }}" from {{ instance_name }}</description>
+    {% for result in results %}
+    <item>
+        <title>{{ result.title }}</title>
+        <link>{{ result.url }}</link>
+        <guid>{{ result.url }}</guid>
+        <description>
+            {% match result.content %}
+                {% when crate::models::ResultContent::Text(text) %}
+                    {{ text }}
+                {% when _ %}
+                    Media result
+            {% endmatch %}
+        </description>
+    </item>
+    {% endfor %}
+  </channel>
+</rss>

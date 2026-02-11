@@ -236,9 +236,13 @@ mod tests {
     async fn test_search_category_filtering() {
         // Construct a dummy settings object manually
         let settings = Arc::new(ArcSwap::from(Arc::new(Settings {
+             general: crate::config::GeneralSettings {
+                 instance_name: "SearXNG".into(),
+             },
              server: crate::config::ServerSettings {
                  bind_address: "127.0.0.1".into(),
                  port: 8080,
+                 base_url: "http://localhost:8080".into(),
                  secret_key: "secret".into(),
              },
              debug: false,
@@ -294,9 +298,13 @@ mod tests {
         );
 
         let settings = Arc::new(ArcSwap::from(Arc::new(Settings {
+             general: crate::config::GeneralSettings {
+                 instance_name: "SearXNG".into(),
+             },
              server: crate::config::ServerSettings {
                  bind_address: "127.0.0.1".into(),
                  port: 8080,
+                 base_url: "http://localhost:8080".into(),
                  secret_key: "secret".into(),
              },
              debug: false,
@@ -345,9 +353,13 @@ mod tests {
         );
 
         let settings = Arc::new(ArcSwap::from(Arc::new(Settings {
+             general: crate::config::GeneralSettings {
+                 instance_name: "SearXNG".into(),
+             },
              server: crate::config::ServerSettings {
                  bind_address: "127.0.0.1".into(),
                  port: 8080,
+                 base_url: "http://localhost:8080".into(),
                  secret_key: "secret".into(),
              },
              debug: false,

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>{{ instance_name }}</ShortName>
+  <Description>Search {{ instance_name }}</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Image width="16" height="16" type="image/x-icon">{{ base_url }}/static/img/favicon.png</Image>
+  <Url type="text/html" method="get" template="{{ base_url }}/search?q={searchTerms}"/>
+  <Url type="application/x-suggestions+json" method="get" template="{{ base_url }}/search?q={searchTerms}&amp;format=json"/>
+</OpenSearchDescription>

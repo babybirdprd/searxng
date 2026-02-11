@@ -18,6 +18,8 @@ pub struct SearchQuery {
     pub categories: String,
     #[serde(default)]
     pub time_range: String,
+    #[serde(default)]
+    pub format: String,
 }
 
 impl Default for SearchQuery {
@@ -29,6 +31,7 @@ impl Default for SearchQuery {
             safesearch: 0,
             categories: "".to_string(),
             time_range: "".to_string(),
+            format: "".to_string(),
         }
     }
 }
