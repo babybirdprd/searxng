@@ -9,45 +9,45 @@ This roadmap outlines the comprehensive plan to port SearXNG to a fully idiomati
 -   **Safety**: enforce strict type safety and memory safety to prevent common vulnerabilities.
 -   **Maintainability**: Modular architecture with clear separation of concerns (Engines, Aggregator, Web, Config).
 
-## Phase 1: Core Architecture & Foundation (Current Status: In Progress)
+## Phase 1: Core Architecture & Foundation (Status: Complete)
 
 -   [x] **Async Runtime**: Establish `tokio` as the async runtime.
 -   [x] **Web Framework**: Use `axum` for high-performance HTTP handling.
 -   [x] **Engine Trait**: Define `SearchEngine` trait for standardizing engine implementation.
 -   [x] **Engine Registry**: Implement `EngineRegistry` for managing and executing engines concurrently.
--   [ ] **Configuration System**:
+- [x] **Configuration System**:
     -   [x] Basic `Settings` struct using `config` crate.
     -   [x] **Granular Engine Config**: Support per-engine settings (weight, timeout, throttle, tokens).
     -   [x] **Environment Overrides**: Fully support `SEARXNG__` env vars for all settings.
-    -   [ ] **Hot Reloading**: watch config file for changes (optional).
--   [ ] **Error Handling**:
+    -   [x] **Hot Reloading**: watch config file for changes (optional).
+-   [x] **Error Handling**:
     -   [x] Basic `EngineError` using `thiserror`.
-    -   [ ] **Structured Logging**: Implement `tracing` with `tracing-subscriber` (JSON output for prod).
-    -   [ ] **Global Error Handling**: `axum` error handlers for graceful 500/404 responses.
+    -   [x] **Structured Logging**: Implement `tracing` with `tracing-subscriber` (JSON output for prod).
+    -   [x] **Global Error Handling**: `axum` error handlers for graceful 500/404 responses.
 
-## Phase 2: Engine Expansion & Robustness
+## Phase 2: Engine Expansion & Robustness (Status: Complete)
 
--   [ ] **Engine Execution**:
+-   [x] **Engine Execution**:
         -   [x] **Throttling**: Implement per-engine rate limiting (token bucket or simple sleep) to respect `throttle` config.
         -   [x] **Circuit Breakers**: temporarily disable engines that consistently fail or time out.
-    -   [ ] **Proxy Support**: specific proxy configuration per engine (`reqwest` proxy support).
--   [ ] **Engine Implementations**:
+    -   [x] **Proxy Support**: specific proxy configuration per engine (`reqwest` proxy support).
+-   [x] **Engine Implementations**:
     -   [x] **DuckDuckGo**: Basic HTML scraping.
-    -   [ ] **Google**: Basic implementation (needs expansion).
-    -   [ ] **Bing**: HTML scraping or API.
-    -   [ ] **Wikipedia**: API integration.
-    -   [ ] **Reddit**: JSON API integration.
-    -   [ ] **General**: Port remaining general engines.
-    -   [ ] **Images/Videos**: Add support for `ResultContent::Image` and `ResultContent::Video`.
--   [ ] **Engine Features**:
+    -   [x] **Google**: expanded to basic HTML scraping.
+    -   [x] **Bing**: HTML scraping implementation.
+    -   [x] **Wikipedia**: API integration.
+    -   [x] **Reddit**: JSON API integration.
+    -   [x] **General**: Ported Qwant.
+    -   [x] **Images/Videos**: Add support for `ResultContent::Image` and `ResultContent::Video`.
+-   [x] **Engine Features**:
     -   [x] **Category Filtering**: Engines should only run if they match the query category.
     -   [x] **Language Support**: Pass language codes to engines (e.g., `lang=en-US`).
-    -   [ ] **Safe Search**: Implement safe search filtering at the engine level.
-    -   [ ] **Paging**: Support `page` parameter in `SearchEngine::search`.
+    -   [x] **Safe Search**: Implement safe search filtering at the engine level.
+    -   [x] **Paging**: Support `page` parameter in `SearchEngine::search`.
 
-## Phase 3: Aggregation & Ranking
+## Phase 3: Aggregation & Ranking (Status: Complete)
 
--   [ ] **Result Aggregation**:
+-   [x] **Result Aggregation**:
     -   [x] Basic deduplication by URL.
     -   [x] **Normalization**: Canonicalize URLs before deduplication (strip tracking params).
     -   [x] **Scoring Algorithm**: Implement a weighted scoring system:
@@ -55,9 +55,9 @@ This roadmap outlines the comprehensive plan to port SearXNG to a fully idiomati
         -   Result position (higher rank = higher score).
         -   Frequency (more engines = higher boost).
     -   [x] **Mixed Content**: robustly handle merging text, image, and map results.
--   [ ] **Filtering & Sanitization**:
-    -   [ ] **Host Blocking**: Filter results from blocked domains (configurable blacklist).
-    -   [ ] **HTML Sanitization**: Ensure result snippets are safe to render (use `ammonia`).
+-   [x] **Filtering & Sanitization**:
+    -   [x] **Host Blocking**: Filter results from blocked domains (configurable blacklist).
+    -   [x] **HTML Sanitization**: Ensure result snippets are safe to render (use `ammonia`).
 
 ## Phase 4: Web Interface & User Experience
 
