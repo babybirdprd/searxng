@@ -1,8 +1,9 @@
 use crate::engines::error::EngineError;
 use crate::engines::SearchEngine;
-use crate::models::{SearchQuery, SearchResult};
+use crate::models::{ResultContent, SearchQuery, SearchResult};
 use async_trait::async_trait;
 use reqwest::Client;
+use std::collections::HashMap;
 
 pub struct Google;
 
@@ -20,18 +21,21 @@ impl SearchEngine for Google {
         vec!["general".to_string()]
     }
 
-    async fn search(&self, query: &SearchQuery, _client: &Client) -> Result<Vec<SearchResult>, EngineError> {
+    async fn search(
+        &self,
+        query: &SearchQuery,
+        _client: &Client,
+    ) -> Result<Vec<SearchResult>, EngineError> {
         // For now, return a mock result to validate multi-engine support.
         // In the future, this will implement actual scraping or API calls.
-        let results = vec![
-            SearchResult {
-                url: "https://www.google.com/search?q=rust".to_string(),
-                title: format!("Google Search Result for {}", query.q),
-                content: "This is a mock result from the Google engine.".to_string(),
-                engine: self.id(),
-                score: 1.0,
-            }
-        ];
+        let results = vec![SearchResult {
+            url: "https://www.google.com/search?q=rust".to_string(),
+            title: format!("Google Search Result for {}", query.q),
+            content: ResultContent::Text("This is a mock result from the Google engine.".to_string()),
+            engine: self.id(),
+            score: 1.0,
+            metadata: HashMap::new(),
+        }];
 
         // Simulate some network delay
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;

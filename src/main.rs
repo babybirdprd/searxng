@@ -4,9 +4,9 @@ mod models;
 mod web;
 
 use crate::config::Settings;
+use crate::engines::duckduckgo::DuckDuckGo;
 use crate::engines::dummy::DummyEngine;
 use crate::engines::google::Google;
-use crate::engines::duckduckgo::DuckDuckGo;
 use crate::engines::registry::EngineRegistry;
 use crate::web::AppState;
 use reqwest::Client;

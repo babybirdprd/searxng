@@ -19,10 +19,18 @@ pub struct EngineConfig {
     pub extra: HashMap<String, String>,
 }
 
-fn default_engine_enabled() -> bool { true }
-fn default_engine_weight() -> f64 { 1.0 }
-fn default_engine_timeout() -> u64 { 2 }
-fn default_engine_throttle() -> u64 { 500 }
+fn default_engine_enabled() -> bool {
+    true
+}
+fn default_engine_weight() -> f64 {
+    1.0
+}
+fn default_engine_timeout() -> u64 {
+    2
+}
+fn default_engine_throttle() -> u64 {
+    500
+}
 
 impl Default for EngineConfig {
     fn default() -> Self {

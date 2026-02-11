@@ -1,12 +1,12 @@
-use crate::engines::SearchEngine;
-use crate::models::{SearchQuery, SearchResult};
 use crate::config::Settings;
 use crate::engines::aggregator::aggregate;
+use crate::engines::SearchEngine;
+use crate::models::{SearchQuery, SearchResult};
 use reqwest::Client;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::task::JoinSet;
 use std::time::Duration;
+use tokio::task::JoinSet;
 
 pub struct EngineRegistry {
     engines: HashMap<String, Arc<dyn SearchEngine>>,
@@ -51,7 +51,7 @@ impl EngineRegistry {
                                 res.score *= config.weight;
                             }
                             results
-                        },
+                        }
                         Err(e) => {
                             tracing::error!("Engine {} failed: {}", id, e);
                             vec![]

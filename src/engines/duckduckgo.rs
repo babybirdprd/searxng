@@ -1,9 +1,10 @@
 use crate::engines::error::EngineError;
 use crate::engines::SearchEngine;
-use crate::models::{SearchQuery, SearchResult};
+use crate::models::{ResultContent, SearchQuery, SearchResult};
 use async_trait::async_trait;
 use reqwest::Client;
 use scraper::{Html, Selector};
+use std::collections::HashMap;
 
 pub struct DuckDuckGo;
 
@@ -21,31 +22,34 @@ impl SearchEngine for DuckDuckGo {
         vec!["general".to_string()]
     }
 
-    async fn search(&self, query: &SearchQuery, client: &Client) -> Result<Vec<SearchResult>, EngineError> {
+    async fn search(
+        &self,
+        query: &SearchQuery,
+        client: &Client,
+    ) -> Result<Vec<SearchResult>, EngineError> {
         let url = "https://html.duckduckgo.com/html/";
 
-        let params = [
-            ("q", query.q.as_str()),
-            ("b", ""),
-            ("kl", "wt-wt"),
-        ];
+        let params = [("q", query.q.as_str()), ("b", ""), ("kl", "wt-wt")];
 
-        let resp = client.post(url)
-            .form(&params)
-            .send()
-            .await?;
+        let resp = client.post(url).form(&params).send().await?;
 
         if !resp.status().is_success() {
-            return Err(EngineError::Unexpected(anyhow::anyhow!("DuckDuckGo returned status: {}", resp.status())));
+            return Err(EngineError::Unexpected(anyhow::anyhow!(
+                "DuckDuckGo returned status: {}",
+                resp.status()
+            )));
         }
 
         let text = resp.text().await?;
         let document = Html::parse_document(&text);
 
         // Selectors
-        let result_selector = Selector::parse("div#links > div.web-result").expect("Invalid selector");
-        let title_selector = Selector::parse("h2 > a").expect("Invalid selector");
-        let snippet_selector = Selector::parse("a.result__snippet").expect("Invalid selector");
+        let result_selector = Selector::parse("div#links > div.web-result")
+            .map_err(|e| EngineError::Parsing(format!("Invalid result selector: {:?}", e)))?;
+        let title_selector = Selector::parse("h2 > a")
+             .map_err(|e| EngineError::Parsing(format!("Invalid title selector: {:?}", e)))?;
+        let snippet_selector = Selector::parse("a.result__snippet")
+             .map_err(|e| EngineError::Parsing(format!("Invalid snippet selector: {:?}", e)))?;
 
         let mut results = Vec::new();
 
@@ -61,7 +65,7 @@ impl SearchEngine for DuckDuckGo {
                 None => continue,
             };
 
-            let content = match element.select(&snippet_selector).next() {
+            let content_text = match element.select(&snippet_selector).next() {
                 Some(el) => el.text().collect::<Vec<_>>().join(" "),
                 None => String::new(),
             };
@@ -69,9 +73,10 @@ impl SearchEngine for DuckDuckGo {
             results.push(SearchResult {
                 url,
                 title,
-                content,
+                content: ResultContent::Text(content_text),
                 engine: self.id(),
                 score: 1.0,
+                metadata: HashMap::new(),
             });
         }
 

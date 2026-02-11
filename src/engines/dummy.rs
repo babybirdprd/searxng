@@ -1,7 +1,9 @@
-use crate::engines::{SearchEngine, error::EngineError};
-use crate::models::{SearchQuery, SearchResult};
+use crate::engines::error::EngineError;
+use crate::engines::SearchEngine;
+use crate::models::{ResultContent, SearchQuery, SearchResult};
 use async_trait::async_trait;
 use reqwest::Client;
+use std::collections::HashMap;
 
 pub struct DummyEngine;
 
@@ -23,16 +25,21 @@ impl SearchEngine for DummyEngine {
         1.0
     }
 
-    async fn search(&self, query: &SearchQuery, _client: &Client) -> Result<Vec<SearchResult>, EngineError> {
+    async fn search(
+        &self,
+        query: &SearchQuery,
+        _client: &Client,
+    ) -> Result<Vec<SearchResult>, EngineError> {
         // Simulate an asynchronous operation
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         let results = vec![SearchResult {
             url: "https://example.com".to_string(),
             title: format!("Example result for {}", query.q),
-            content: "This is a dummy result".to_string(),
+            content: ResultContent::Text("This is a dummy result".to_string()),
             engine: "dummy".to_string(),
             score: 1.0,
+            metadata: HashMap::new(),
         }];
         Ok(results)
     }

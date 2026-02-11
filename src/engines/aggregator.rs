@@ -40,30 +40,34 @@ pub fn aggregate(results: Vec<SearchResult>) -> Vec<SearchResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::SearchResult;
+    use crate::models::{ResultContent, SearchResult};
+    use std::collections::HashMap;
 
     #[test]
     fn test_aggregate_boosts_score() {
         let res1 = SearchResult {
             url: "https://example.com".to_string(),
             title: "Example".to_string(),
-            content: "Content".to_string(),
+            content: ResultContent::Text("Content".to_string()),
             engine: "engine1".to_string(),
             score: 1.0,
+            metadata: HashMap::new(),
         };
         let res2 = SearchResult {
             url: "https://example.com".to_string(),
             title: "Example".to_string(),
-            content: "Content".to_string(),
+            content: ResultContent::Text("Content".to_string()),
             engine: "engine2".to_string(),
             score: 1.0,
+            metadata: HashMap::new(),
         };
         let res3 = SearchResult {
             url: "https://other.com".to_string(),
             title: "Other".to_string(),
-            content: "Other Content".to_string(),
+            content: ResultContent::Text("Other Content".to_string()),
             engine: "engine1".to_string(),
             score: 0.5,
+            metadata: HashMap::new(),
         };
 
         let results = vec![res1, res2, res3];
@@ -71,11 +75,17 @@ mod tests {
 
         assert_eq!(aggregated.len(), 2);
 
-        let example_res = aggregated.iter().find(|r| r.url == "https://example.com").unwrap();
+        let example_res = aggregated
+            .iter()
+            .find(|r| r.url == "https://example.com")
+            .unwrap();
         // Initial score 1.0 + boost (1.0 * 0.1) = 1.1
         assert!((example_res.score - 1.1).abs() < f64::EPSILON);
 
-        let other_res = aggregated.iter().find(|r| r.url == "https://other.com").unwrap();
+        let other_res = aggregated
+            .iter()
+            .find(|r| r.url == "https://other.com")
+            .unwrap();
         assert!((other_res.score - 0.5).abs() < f64::EPSILON);
     }
 }

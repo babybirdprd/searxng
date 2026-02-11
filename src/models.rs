@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 fn default_page() -> u32 {
     1
@@ -16,12 +17,23 @@ pub struct SearchQuery {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "data")]
+pub enum ResultContent {
+    Text(String),
+    Image { src: String, thumbnail: Option<String> },
+    Video { src: String, thumbnail: Option<String>, duration: Option<String> },
+    Map { latitude: f64, longitude: f64, zoom: Option<u8> },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
     pub url: String,
     pub title: String,
-    pub content: String,
+    pub content: ResultContent,
     pub engine: String,
     pub score: f64,
+    #[serde(default)]
+    pub metadata: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
