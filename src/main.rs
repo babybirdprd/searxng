@@ -1,14 +1,10 @@
-mod config;
-mod engines;
-mod models;
-mod web;
-
-use crate::config::Settings;
-use crate::engines::duckduckgo::DuckDuckGo;
-use crate::engines::dummy::DummyEngine;
-use crate::engines::google::Google;
-use crate::engines::registry::EngineRegistry;
-use crate::web::AppState;
+use searxng_rs::config::Settings;
+use searxng_rs::engines::duckduckgo::DuckDuckGo;
+use searxng_rs::engines::dummy::DummyEngine;
+use searxng_rs::engines::google::Google;
+use searxng_rs::engines::registry::EngineRegistry;
+use searxng_rs::web::AppState;
+use searxng_rs::web;
 use reqwest::Client;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

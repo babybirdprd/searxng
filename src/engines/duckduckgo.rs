@@ -31,7 +31,13 @@ impl SearchEngine for DuckDuckGo {
     ) -> Result<Vec<SearchResult>, EngineError> {
         let url = "https://html.duckduckgo.com/html/";
 
-        let params = [("q", query.q.as_str()), ("b", ""), ("kl", "wt-wt")];
+        let language = if query.language.is_empty() {
+            "wt-wt"
+        } else {
+            &query.language
+        };
+
+        let params = [("q", query.q.as_str()), ("b", ""), ("kl", language)];
 
         let resp = client.post(url).form(&params).send().await?;
 
@@ -76,7 +82,7 @@ impl SearchEngine for DuckDuckGo {
                 url,
                 title,
                 content: ResultContent::Text(content_text),
-                engine: self.id(),
+                engines: vec![self.id()],
                 score: 1.0,
                 metadata: HashMap::new(),
             });

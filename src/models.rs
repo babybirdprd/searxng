@@ -60,7 +60,7 @@ pub struct SearchResult {
     pub url: String,
     pub title: String,
     pub content: ResultContent,
-    pub engine: String,
+    pub engines: Vec<String>,
     pub score: f64,
     #[serde(default)]
     pub metadata: HashMap<String, String>,
